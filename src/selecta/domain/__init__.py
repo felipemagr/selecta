@@ -1,0 +1,1 @@
+"""Pure types and rules."""

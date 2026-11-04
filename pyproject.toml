@@ -1,0 +1,39 @@
+[project]
+name = "selecta"
+version = "0.1.0"
+description = "A voice record-picker for a debloated TV"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "ruff>=0.13",
+    "pytest>=8.0",
+    "import-linter>=2.15",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "ASYNC", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.importlinter]
+root_package = "selecta"
+
+[[tool.importlinter.contracts]]
+name = "layers"
+type = "layers"
+layers = ["selecta.infrastructure", "selecta.application", "selecta.domain"]
+
+[tool.pytest.ini_options]
+addopts = "-ra -q"

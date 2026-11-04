@@ -1,0 +1,1 @@
+"""Adapters and entry points."""
