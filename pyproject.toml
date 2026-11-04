@@ -5,7 +5,12 @@ description = "A voice record-picker for a debloated TV"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "httpx>=0.28.1",
+]
+
+[project.scripts]
+selecta-discogs = "selecta.infrastructure.integrations.discogs:main"
 
 [dependency-groups]
 dev = [
@@ -22,7 +27,15 @@ build-backend = "hatchling.build"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "SIM", "ASYNC", "TID"]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "ASYNC", "TID", "D", "D401"]
+ignore = ["D104", "D105", "D107"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+"src/selecta/infrastructure/config.py" = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"

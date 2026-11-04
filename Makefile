@@ -1,4 +1,4 @@
-.PHONY: install test check quality
+.PHONY: install test check quality discogs
 
 install:
 	uv sync
@@ -14,3 +14,6 @@ check:
 quality:
 	uv run ruff check --fix
 	uv run ruff format
+
+discogs:
+	uv run $(if $(wildcard .env),--env-file .env) selecta-discogs
