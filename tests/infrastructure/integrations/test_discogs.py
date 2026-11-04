@@ -72,6 +72,17 @@ def test_export_resumes_from_cached_details(fake: FakeDiscogs, tmp_path: Path) -
     assert not {"/releases/1", "/releases/2", "/masters/10"} & set(fake.paths)
 
 
+def test_export_removes_details_no_longer_in_collection(fake: FakeDiscogs, tmp_path: Path) -> None:
+    for kind in ("releases", "masters"):
+        (tmp_path / kind).mkdir()
+        (tmp_path / kind / "99.json").write_text("{}")
+
+    _export(fake, tmp_path)
+
+    assert sorted(p.name for p in (tmp_path / "releases").iterdir()) == ["1.json", "2.json"]
+    assert not (tmp_path / "masters" / "99.json").exists()
+
+
 def test_rate_limited_request_is_retried(fake: FakeDiscogs, tmp_path: Path) -> None:
     fake.rate_limit_once = True
 

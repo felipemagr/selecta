@@ -31,4 +31,4 @@ The script finds the token's owner (`/oauth/identity`) and saves:
 | `masters/{id}.json` | `/masters/{id}` | original release year and main release |
 | `artists/{id}.json` | `/artists/{id}` | artist profile, members, links |
 
-Discogs allows 60 authenticated requests per minute, so a collection of ~100 records takes a few minutes. The script waits when the budget runs out. Release, master and artist files are cached, so rerunning resumes an interrupted export. Delete `data/discogs/` to fetch everything again.
+Discogs allows 60 authenticated requests per minute, so a collection of ~100 records takes a few minutes. The script waits when the budget runs out. Release, master and artist files are cached, so rerunning is a quick resync: it fetches only records added since the last run and deletes files for records you removed. Delete `data/discogs/` to fetch everything again.
