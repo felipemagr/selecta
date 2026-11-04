@@ -129,6 +129,7 @@ def export(client: DiscogsClient, out_dir: Path) -> None:
 def main() -> None:
     """Run the export with the token from the environment."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     if not config.DISCOGS.TOKEN:
         sys.exit("DISCOGS_TOKEN is not set, see .env.example")
     try:
