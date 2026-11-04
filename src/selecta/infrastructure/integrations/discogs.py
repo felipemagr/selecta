@@ -90,7 +90,14 @@ def _write(path: Path, data: Any) -> None:
 
 
 def _fetch_details(client: DiscogsClient, kind: str, ids: set[int], out_dir: Path) -> list[dict]:
-    """Fetch each resource once. Files on disk are reused, so a rerun resumes."""
+    """Fetch each resource once and delete files no longer referenced.
+
+    Files on disk are reused, so a rerun resumes and only fetches new ids.
+    """
+    for path in (out_dir / kind).glob("*.json"):
+        if int(path.stem) not in ids:
+            logger.info("removing %s %s", kind, path.stem)
+            path.unlink()
     results = []
     for i, item_id in enumerate(sorted(ids), 1):
         path = out_dir / kind / f"{item_id}.json"
