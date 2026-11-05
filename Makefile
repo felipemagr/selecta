@@ -1,10 +1,12 @@
-.PHONY: install test check quality discogs
+.PHONY: install test check quality db export index sync
+
+UV_RUN := uv run $(if $(wildcard .env),--env-file .env)
 
 install:
 	uv sync
 
 test: check
-	uv run pytest || test $$? -eq 5  # 5: no tests collected
+	$(UV_RUN) pytest || test $$? -eq 5  # 5: no tests collected
 
 check:
 	uv run ruff check
@@ -15,5 +17,14 @@ quality:
 	uv run ruff check --fix
 	uv run ruff format
 
-discogs:
-	uv run $(if $(wildcard .env),--env-file .env) selecta-discogs
+db:
+	docker compose up -d --wait db
+
+export:
+	$(UV_RUN) selecta export
+
+index: db
+	$(UV_RUN) selecta index
+
+sync: db
+	$(UV_RUN) selecta sync

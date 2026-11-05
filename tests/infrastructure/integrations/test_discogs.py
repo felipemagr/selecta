@@ -5,7 +5,23 @@ import httpx
 import pytest
 
 from selecta.infrastructure.integrations import discogs
-from selecta.infrastructure.integrations.discogs import DiscogsClient, export
+from selecta.infrastructure.integrations.discogs import (
+    DiscogsClient,
+    DiscogsError,
+    DiscogsExport,
+    export,
+)
+
+WANTED = {
+    "id": 3,
+    "title": "Album",
+    "year": 2020,
+    "artists": [{"id": 100, "name": "Band (2)"}],
+    "labels": [{"name": "Label"}],
+    "formats": [{"name": "Vinyl", "descriptions": ["LP"]}],
+    "genres": ["Rock"],
+    "styles": [],
+}
 
 
 def _page(key: str, items: list[dict], page: int, pages: int) -> dict:
@@ -13,7 +29,7 @@ def _page(key: str, items: list[dict], page: int, pages: int) -> dict:
 
 
 class FakeDiscogs:
-    """Two collection pages, one release with a master and an artist."""
+    """Two collection pages, one wanted record, a master and a missing artist."""
 
     def __init__(self) -> None:
         self.paths: list[str] = []
@@ -32,9 +48,11 @@ class FakeDiscogs:
             case "/users/listener/collection/folders/0/releases":
                 body = _page("releases", [{"id": page}], page, 2)
             case "/users/listener/wants":
-                body = _page("wants", [], 1, 1)
+                body = _page("wants", [{"id": 3, "basic_information": WANTED}], 1, 1)
             case "/releases/1" | "/releases/2":
-                body = {"id": 1, "master_id": 10, "artists": [{"id": 100}]}
+                body = {**WANTED, "id": int(path.rsplit("/", 1)[1]), "master_id": 10}
+            case "/masters/10":
+                body = {"id": 10, "year": 1975}
             case "/artists/100":
                 return httpx.Response(404)
             case _:
@@ -89,3 +107,18 @@ def test_rate_limited_request_is_retried(fake: FakeDiscogs, tmp_path: Path) -> N
     _export(fake, tmp_path)
 
     assert fake.paths[:2] == ["/oauth/identity", "/oauth/identity"]
+
+
+def test_export_loads_as_collection(fake: FakeDiscogs, tmp_path: Path) -> None:
+    _export(fake, tmp_path)
+
+    collection = DiscogsExport(tmp_path).load()
+
+    release = next(r for r in collection.releases if r.id == 1)
+    assert (release.original_year, release.artists) == (1975, ["Band"])
+    assert {i.release_id: i.owned for i in collection.items} == {1: True, 2: True, 3: False}
+
+
+def test_loading_without_export_fails_instead_of_emptying_collection(tmp_path: Path) -> None:
+    with pytest.raises(DiscogsError):
+        DiscogsExport(tmp_path).load()
