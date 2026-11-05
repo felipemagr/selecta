@@ -8,7 +8,7 @@ from selecta.domain.collection import Collection, Release, ReleaseSummary
 
 
 class CollectionQuery(BaseModel):
-    """Filters for searching a household's records. Unset filters match everything."""
+    """Filters for searching the collection. Unset filters match everything."""
 
     text: str | None = None
     genre: str | None = None
@@ -22,7 +22,7 @@ class CollectionQuery(BaseModel):
 
 
 class CollectionSource(Protocol):
-    """Where a household's collection comes from."""
+    """Where the listener's collection comes from."""
 
     def load(self) -> Collection:
         """Return the full collection."""
@@ -32,14 +32,14 @@ class CollectionSource(Protocol):
 class CollectionStore(Protocol):
     """Where collections are kept and searched."""
 
-    def replace(self, household_id: str, collection: Collection) -> None:
+    def replace(self, collection: Collection) -> None:
         """Make the stored collection match `collection` exactly."""
         ...
 
-    def search(self, household_id: str, query: CollectionQuery) -> list[ReleaseSummary]:
+    def search(self, query: CollectionQuery) -> list[ReleaseSummary]:
         """Return releases matching the query."""
         ...
 
-    def get_release(self, household_id: str, release_id: int) -> Release | None:
-        """Return one of the household's releases with tracks and credits, or None."""
+    def get_release(self, release_id: int) -> Release | None:
+        """Return a release with tracks and credits, or None if unknown."""
         ...

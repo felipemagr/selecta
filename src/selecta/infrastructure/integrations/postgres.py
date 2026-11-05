@@ -8,15 +8,33 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from selecta.application.ports import CollectionQuery
-from selecta.domain.collection import Collection, Release, ReleaseSummary
+from selecta.domain.collection import Collection, CollectionItem, Release, ReleaseSummary
 
-_SUMMARY_COLUMNS = (
-    "r.id, r.title, r.artists, r.original_year, r.label, r.format, r.genres, r.styles"
-)
+_SUMMARY_COLUMNS = "id, title, artists, original_year, label, format, genres, styles"
+_COLUMNS = [
+    "id",
+    "owned",
+    "date_added",
+    "title",
+    "artists",
+    "artist_ids",
+    "year",
+    "original_year",
+    "label",
+    "country",
+    "format",
+    "genres",
+    "styles",
+    "notes",
+    "cover_url",
+    "tracks",
+    "credits",
+    "search_text",
+]
 _SORTS = {
-    "oldest": "coalesce(r.original_year, r.year) ASC NULLS LAST",
-    "newest": "coalesce(r.original_year, r.year) DESC NULLS LAST",
-    "recently_added": "c.date_added DESC NULLS LAST",
+    "oldest": "coalesce(original_year, year) ASC NULLS LAST",
+    "newest": "coalesce(original_year, year) DESC NULLS LAST",
+    "recently_added": "date_added DESC NULLS LAST",
 }
 # Measured on real data: one-letter misspellings ("craftwerk") score 0.70, unrelated hits <= 0.64.
 FUZZY_MATCH_THRESHOLD = 0.65
@@ -40,33 +58,19 @@ class PostgresStore:
         """Close the connection."""
         self._conn.close()
 
-    def replace(self, household_id: str, collection: Collection) -> None:
+    def replace(self, collection: Collection) -> None:
         """Make the stored collection match `collection` exactly, in one transaction."""
-        owned = {i.release_id for i in collection.items if i.owned}
+        items = {i.release_id: i for i in collection.items}
+        rows = [_release_row(r, items[r.id]) for r in collection.releases]
         with self._conn.transaction():
             self._conn.cursor().executemany(
-                """
-                INSERT INTO releases VALUES (
-                    %(id)s, %(title)s, %(artists)s, %(artist_ids)s, %(year)s, %(original_year)s,
-                    %(label)s, %(country)s, %(format)s, %(genres)s, %(styles)s, %(notes)s,
-                    %(cover_url)s, %(tracks)s, %(credits)s, %(search_text)s)
-                ON CONFLICT (id) DO UPDATE SET (
-                    title, artists, artist_ids, year, original_year, label, country, format,
-                    genres, styles, notes, cover_url, tracks, credits, search_text
-                ) = (
-                    EXCLUDED.title, EXCLUDED.artists, EXCLUDED.artist_ids, EXCLUDED.year,
-                    EXCLUDED.original_year, EXCLUDED.label, EXCLUDED.country, EXCLUDED.format,
-                    EXCLUDED.genres, EXCLUDED.styles, EXCLUDED.notes, EXCLUDED.cover_url,
-                    EXCLUDED.tracks, EXCLUDED.credits, EXCLUDED.search_text)
-                WHERE %(full)s
+                f"""
+                INSERT INTO releases ({", ".join(_COLUMNS)})
+                VALUES ({", ".join(f"%({c})s" for c in _COLUMNS)})
+                ON CONFLICT (id) DO UPDATE SET ({", ".join(_COLUMNS[1:])})
+                    = ({", ".join(f"EXCLUDED.{c}" for c in _COLUMNS[1:])})
                 """,
-                # Wantlist rows are summaries, so they never overwrite a full release.
-                [{**_release_row(r), "full": r.id in owned} for r in collection.releases],
-            )
-            self._conn.execute("DELETE FROM collection WHERE household_id = %s", [household_id])
-            self._conn.cursor().executemany(
-                "INSERT INTO collection VALUES (%s, %s, %s, %s)",
-                [(household_id, i.release_id, i.owned, i.date_added) for i in collection.items],
+                rows,
             )
             self._conn.cursor().executemany(
                 """
@@ -77,50 +81,45 @@ class PostgresStore:
                 [a.model_dump(mode="json") for a in collection.artists],
             )
             self._conn.execute(
-                "DELETE FROM releases WHERE id NOT IN (SELECT release_id FROM collection)"
+                "DELETE FROM releases WHERE NOT (id = ANY(%s))", [[r["id"] for r in rows]]
             )
             self._conn.execute(
                 "DELETE FROM artists WHERE id NOT IN (SELECT unnest(artist_ids) FROM releases)"
             )
 
-    def search(self, household_id: str, query: CollectionQuery) -> list[ReleaseSummary]:
-        """Return the household's releases matching every set filter."""
-        where = ["c.household_id = %(household)s", "c.owned = %(owned)s"]
-        params: dict[str, Any] = {"household": household_id, **query.model_dump()}
+    def search(self, query: CollectionQuery) -> list[ReleaseSummary]:
+        """Return releases matching every set filter."""
+        where = ["owned = %(owned)s"]
         if query.text:
-            where.append("%(text)s <%% r.search_text")
+            where.append("%(text)s <%% search_text")
         if query.genre:
-            where.append("lower(%(genre)s) = ANY (SELECT lower(g) FROM unnest(r.genres) g)")
+            where.append("lower(%(genre)s) = ANY (SELECT lower(g) FROM unnest(genres) g)")
         if query.style:
-            where.append("lower(%(style)s) = ANY (SELECT lower(s) FROM unnest(r.styles) s)")
+            where.append("lower(%(style)s) = ANY (SELECT lower(s) FROM unnest(styles) s)")
         if query.label:
-            where.append("strpos(lower(r.label), lower(%(label)s)) > 0")
+            where.append("strpos(lower(label), lower(%(label)s)) > 0")
         if query.year_from:
-            where.append("coalesce(r.original_year, r.year) >= %(year_from)s")
+            where.append("coalesce(original_year, year) >= %(year_from)s")
         if query.year_to:
-            where.append("coalesce(r.original_year, r.year) <= %(year_to)s")
+            where.append("coalesce(original_year, year) <= %(year_to)s")
         order = _SORTS.get(query.sort)
         if order is None:
-            order = "word_similarity(%(text)s, r.search_text) DESC" if query.text else "r.title"
+            order = "word_similarity(%(text)s, search_text) DESC" if query.text else "title"
         rows = self._conn.execute(
-            f"SELECT {_SUMMARY_COLUMNS} FROM releases r JOIN collection c ON c.release_id = r.id "
+            f"SELECT {_SUMMARY_COLUMNS} FROM releases "
             f"WHERE {' AND '.join(where)} ORDER BY {order} LIMIT %(limit)s",
-            params,
+            query.model_dump(),
         ).fetchall()
         return [ReleaseSummary.model_validate(row) for row in rows]
 
-    def get_release(self, household_id: str, release_id: int) -> Release | None:
-        """Return one of the household's releases with tracks and credits, or None."""
-        row = self._conn.execute(
-            "SELECT r.* FROM releases r JOIN collection c ON c.release_id = r.id "
-            "WHERE c.household_id = %s AND r.id = %s",
-            [household_id, release_id],
-        ).fetchone()
+    def get_release(self, release_id: int) -> Release | None:
+        """Return a release with tracks and credits, or None if unknown."""
+        row = self._conn.execute("SELECT * FROM releases WHERE id = %s", [release_id]).fetchone()
         return Release.model_validate(row) if row else None
 
 
-def _release_row(release: Release) -> dict[str, Any]:
-    row = release.model_dump(mode="json")
+def _release_row(release: Release, item: CollectionItem) -> dict[str, Any]:
+    row = {**release.model_dump(mode="json"), "owned": item.owned, "date_added": item.date_added}
     row["tracks"] = Jsonb(row["tracks"])
     row["credits"] = Jsonb(row["credits"])
     row["search_text"] = " ".join(

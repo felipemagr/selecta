@@ -2,6 +2,8 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE TABLE IF NOT EXISTS releases (
     id bigint PRIMARY KEY,
+    owned boolean NOT NULL,
+    date_added timestamptz,
     title text NOT NULL,
     artists text[] NOT NULL,
     artist_ids bigint[] NOT NULL,
@@ -20,14 +22,6 @@ CREATE TABLE IF NOT EXISTS releases (
 );
 
 CREATE INDEX IF NOT EXISTS releases_search_text_idx ON releases USING gin (search_text gin_trgm_ops);
-
-CREATE TABLE IF NOT EXISTS collection (
-    household_id text NOT NULL,
-    release_id bigint NOT NULL REFERENCES releases (id),
-    owned boolean NOT NULL,
-    date_added timestamptz,
-    PRIMARY KEY (household_id, release_id)
-);
 
 CREATE TABLE IF NOT EXISTS artists (
     id bigint PRIMARY KEY,

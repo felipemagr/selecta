@@ -12,8 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-selecta-discogs = "selecta.infrastructure.integrations.discogs:main"
-selecta-index = "selecta.infrastructure.entrypoints.cli:index"
+selecta = "selecta.infrastructure.entrypoints.cli:main"
 
 [dependency-groups]
 dev = [

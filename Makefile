@@ -1,4 +1,4 @@
-.PHONY: install test check quality db discogs index
+.PHONY: install test check quality db export index sync
 
 UV_RUN := uv run $(if $(wildcard .env),--env-file .env)
 
@@ -20,8 +20,11 @@ quality:
 db:
 	docker compose up -d --wait db
 
-discogs:
-	$(UV_RUN) selecta-discogs
+export:
+	$(UV_RUN) selecta export
 
 index: db
-	$(UV_RUN) selecta-index
+	$(UV_RUN) selecta index
+
+sync: db
+	$(UV_RUN) selecta sync

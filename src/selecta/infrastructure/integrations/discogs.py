@@ -3,7 +3,6 @@
 import json
 import logging
 import re
-import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -140,19 +139,6 @@ def export(client: DiscogsClient, out_dir: Path) -> None:
     logger.info("exported %d collection items to %s", len(collection), out_dir)
 
 
-def main() -> None:
-    """Run the export with the token from the environment."""
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    if not config.DISCOGS.TOKEN:
-        sys.exit("DISCOGS_TOKEN is not set, see .env.example")
-    try:
-        with DiscogsClient(config.DISCOGS.TOKEN) as client:
-            export(client, config.DISCOGS.OUT_DIR)
-    except DiscogsError as e:
-        sys.exit(str(e))
-
-
 class DiscogsExport:
     """Collection source that reads the files written by `export`."""
 
@@ -162,7 +148,7 @@ class DiscogsExport:
     def load(self) -> Collection:
         """Return the exported collection, with wantlist items as not owned."""
         if not (self._dir / "collection.json").exists():
-            raise DiscogsError(f"no export in {self._dir}, run `make discogs` first")
+            raise DiscogsError(f"no export in {self._dir}, run `selecta export` first")
         releases: dict[int, Release] = {}
         items: dict[int, CollectionItem] = {}
         for item in _read(self._dir / "collection.json"):

@@ -64,7 +64,7 @@ class Artist(BaseModel):
 
 
 class CollectionItem(BaseModel):
-    """A release a household owns or wants."""
+    """A release the listener owns or wants."""
 
     release_id: int
     owned: bool
@@ -72,7 +72,7 @@ class CollectionItem(BaseModel):
 
 
 class Collection(BaseModel):
-    """Everything known about one household's records."""
+    """Everything known about the listener's records."""
 
     releases: list[Release]
     artists: list[Artist]

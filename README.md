@@ -11,11 +11,11 @@ make test
 
 ## Collection data
 
-Selecta reads your record collection from the [Discogs API](https://www.discogs.com/developers). Nothing is committed: the export lands in `data/discogs/`, which is gitignored.
+Selecta reads your record collection from the [Discogs API](https://www.discogs.com/developers). Nothing is committed: the export lands in `data/discogs/` (gitignored, or `$SELECTA_DATA_DIR/discogs`).
 
 1. Create a personal access token at <https://www.discogs.com/settings/developers>.
-2. `cp .env.example .env` and set `DISCOGS_TOKEN`.
-3. `make discogs`
+2. `cp .env.example .env` and set `DISCOGS_TOKEN` and `POSTGRES_PASSWORD`.
+3. `make export`
 
 The script finds the token's owner (`/oauth/identity`) and saves:
 
@@ -39,6 +39,7 @@ The agent searches the collection in PostgreSQL (`compose.yaml` runs it locally 
 
 ```bash
 make index   # starts the database and loads data/discogs/ into it
+make sync    # export + index, the usual way to pick up changes on Discogs
 ```
 
-Rerunning `make index` after `make discogs` makes the database match the collection again: new records are added and removed ones deleted. Text search uses `pg_trgm`, so misspelled names still match. Tests for the database run against it and skip when it isn't running.
+`make sync` makes the database match the collection again: new records are added and removed ones deleted. Text search uses `pg_trgm`, so misspelled names still match. Tests for the database run against it and skip when it isn't running.
