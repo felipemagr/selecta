@@ -1,4 +1,4 @@
-"""Collection store on PostgreSQL: fuzzy text via pg_trgm, semantic search via pgvector."""
+"""Collection and session store on PostgreSQL."""
 
 from importlib.resources import files
 from typing import Any
@@ -7,6 +7,7 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from selecta.application.conversation import Session
 from selecta.application.ports import Chunk, ChunkKind, CollectionQuery, Passage
 from selecta.domain.collection import Collection, CollectionItem, Release, ReleaseSummary
 from selecta.domain.enrichment import Enrichment
@@ -45,7 +46,7 @@ SEMANTIC_CANDIDATES = 50
 
 
 class PostgresStore:
-    """CollectionStore backed by PostgreSQL."""
+    """CollectionStore and SessionStore backed by PostgreSQL."""
 
     def __init__(self, conn: psycopg.Connection) -> None:
         """Wrap an autocommit dict-row connection and make sure the schema exists."""
@@ -204,6 +205,21 @@ class PostgresStore:
             },
         ).fetchall()
         return [Passage.model_validate(row) for row in rows]
+
+    def save_session(self, session: Session) -> None:
+        """Insert or replace a session."""
+        self._conn.execute(
+            "INSERT INTO sessions (id, started_at, document) VALUES (%s, %s, %s) "
+            "ON CONFLICT (id) DO UPDATE SET document = EXCLUDED.document, updated_at = now()",
+            [session.id, session.started_at, Jsonb(session.model_dump(mode="json"))],
+        )
+
+    def load_session(self, session_id: str) -> Session | None:
+        """Return a session, or None if unknown."""
+        row = self._conn.execute(
+            "SELECT document FROM sessions WHERE id = %s", [session_id]
+        ).fetchone()
+        return Session.model_validate(row["document"]) if row else None
 
 
 def _migrate(conn: psycopg.Connection) -> None:

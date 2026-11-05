@@ -26,6 +26,8 @@ class MISTRAL:
     API_KEY = os.environ.get("MISTRAL_API_KEY")
     API_URL = "https://api.mistral.ai/v1"
     CHAT_MODEL = "ministral-8b-2512"
+    AGENT_MODEL = "mistral-small-2603"
+    AGENT_TEMPERATURE = 0.3
     EMBED_MODEL = "mistral-embed-2312"
     EMBED_BATCH_SIZE = 16
     MAX_OUTPUT_TOKENS = 400

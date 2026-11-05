@@ -3,6 +3,7 @@ import json
 import httpx
 import pytest
 
+from selecta.application.conversation import Message
 from selecta.application.ports import ModelOutputError
 from selecta.domain.enrichment import Enrichment
 from selecta.infrastructure import config
@@ -36,3 +37,19 @@ def test_answer_outside_schema_raises() -> None:
 
     with pytest.raises(ModelOutputError):
         chat.complete_json("s", "u", Enrichment)
+
+
+def test_tool_calls_are_parsed() -> None:
+    call = {"id": "c1", "function": {"name": "get_release", "arguments": '{"release_id": 7}'}}
+    response = httpx.Response(
+        200,
+        json={
+            "choices": [{"message": {"content": "", "tool_calls": [call]}}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 2},
+        },
+    )
+
+    reply = _chat(response).chat("s", [Message(role="user", content="hi")], [])
+
+    assert reply.text is None
+    assert [(c.name, c.arguments) for c in reply.tool_calls] == [("get_release", {"release_id": 7})]

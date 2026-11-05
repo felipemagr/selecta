@@ -1,4 +1,8 @@
+from datetime import UTC, datetime
+
+from selecta.application.conversation import Message, Session
 from selecta.application.ports import Chunk, CollectionQuery
+from selecta.domain.brief import Answer, Brief
 from selecta.domain.collection import Collection, CollectionItem, Credit, Release, Track
 from selecta.domain.enrichment import Enrichment
 from selecta.infrastructure.integrations.postgres import PostgresStore
@@ -102,3 +106,16 @@ def test_migrations_apply_once(store: PostgresStore) -> None:
     reopened = PostgresStore(store._conn)
 
     assert [r.id for r in reopened.search(CollectionQuery())] == [1]
+
+
+def test_session_round_trips(store: PostgresStore) -> None:
+    session = Session(
+        id="s1",
+        started_at=datetime(2026, 11, 5, tzinfo=UTC),
+        brief=Brief(mood=Answer(value="calm", evidence="something calm")),
+        messages=[Message(role="user", content="something calm")],
+    )
+
+    store.save_session(session)
+
+    assert store.load_session("s1") == session

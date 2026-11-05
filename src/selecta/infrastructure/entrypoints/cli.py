@@ -8,8 +8,10 @@ from contextlib import contextmanager
 
 import psycopg
 
+from selecta.application.agent import Agent
 from selecta.application.indexing import index_collection
 from selecta.application.retrieval import semantic_search
+from selecta.application.tools import Tools
 from selecta.infrastructure import config
 from selecta.infrastructure.integrations import mistral
 from selecta.infrastructure.integrations.discogs import (
@@ -62,6 +64,24 @@ def _search(args: argparse.Namespace) -> None:
             print(f"{p.score:.4f}  {p.kind} {p.ref_id}  {p.text[:160]}")
 
 
+def _chat(_: argparse.Namespace) -> None:
+    api_key = _require("MISTRAL_API_KEY", config.MISTRAL.API_KEY)
+    with _store() as store, mistral.connect(api_key) as http:
+        model = MistralChat(http, config.MISTRAL.AGENT_MODEL)
+        agent = Agent(model, Tools(store, MistralEmbedder(http)), store)
+        session = agent.start()
+        print(f"session {session.id}, empty line or Ctrl-D to stop")
+        while text := _read_line():
+            print(f"selecta> {agent.reply(session, text)}")
+
+
+def _read_line() -> str:
+    try:
+        return input("you> ").strip()
+    except EOFError:
+        return ""
+
+
 def main() -> None:
     """Run a `selecta` subcommand."""
     parser = argparse.ArgumentParser(prog="selecta")
@@ -71,6 +91,7 @@ def main() -> None:
         ("index", _index, "load the export into the database, enrich and embed it"),
         ("sync", _sync, "export, then index"),
         ("search", _search, "search the collection by meaning"),
+        ("chat", _chat, "talk to the agent in the terminal"),
     ]:
         commands.add_parser(name, help=text).set_defaults(run=run)
     search = commands.choices["search"]
