@@ -2,8 +2,9 @@
 
 from typing import Literal, Protocol
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from selecta.application.conversation import Message, Reply, Session, ToolSpec
 from selecta.domain.collection import Collection, Release, ReleaseSummary
 from selecta.domain.enrichment import Energy, Enrichment, Mood
 
@@ -21,10 +22,14 @@ class CollectionQuery(BaseModel):
     energy: Energy | None = None
     owned: bool = True
     sort: Literal["relevance", "oldest", "newest", "recently_added"] = "relevance"
-    limit: int = 10
+    limit: int = Field(default=10, ge=1, le=20)
 
 
-class ModelOutputError(Exception):
+class ModelError(Exception):
+    """A model call failed."""
+
+
+class ModelOutputError(ModelError):
     """A model answered with something that does not match the requested schema."""
 
 
@@ -115,4 +120,26 @@ class Embedder(Protocol):
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         """Return one embedding per text, in order."""
+        ...
+
+
+class AgentModel(Protocol):
+    """An LLM with tool calling."""
+
+    model: str
+
+    def chat(self, system: str, messages: list[Message], tools: list[ToolSpec]) -> Reply:
+        """Return the next reply."""
+        ...
+
+
+class SessionStore(Protocol):
+    """Where conversations are kept."""
+
+    def save_session(self, session: Session) -> None:
+        """Insert or replace a session."""
+        ...
+
+    def load_session(self, session_id: str) -> Session | None:
+        """Return a session, or None if unknown."""
         ...

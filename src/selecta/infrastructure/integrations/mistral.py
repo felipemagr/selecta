@@ -1,5 +1,6 @@
 """Mistral chat and embedding models over the HTTP API."""
 
+import json
 import logging
 import time
 from typing import Any
@@ -7,13 +8,14 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from selecta.application.ports import ModelOutputError
+from selecta.application.conversation import Message, Reply, ToolCall, ToolSpec
+from selecta.application.ports import ModelError, ModelOutputError
 from selecta.infrastructure import config
 
 logger = logging.getLogger(__name__)
 
 
-class MistralError(Exception):
+class MistralError(ModelError):
     """The Mistral API failed in a way a retry did not fix."""
 
 
@@ -28,7 +30,7 @@ def connect(api_key: str, transport: httpx.BaseTransport | None = None) -> httpx
 
 
 class MistralChat:
-    """ChatModel on Mistral's chat completions with strict JSON schema output."""
+    """ChatModel and AgentModel on Mistral's chat completions."""
 
     def __init__(self, http: httpx.Client, model: str = config.MISTRAL.CHAT_MODEL) -> None:
         self._http = http
@@ -58,6 +60,41 @@ class MistralChat:
             return schema.model_validate_json(data["choices"][0]["message"]["content"])
         except ValidationError as e:
             raise ModelOutputError(f"{self.model} returned an invalid {schema.__name__}") from e
+
+    def chat(self, system: str, messages: list[Message], tools: list[ToolSpec]) -> Reply:
+        """Return the next reply."""
+        data = _post(
+            self._http,
+            "/chat/completions",
+            {
+                "model": self.model,
+                "temperature": config.MISTRAL.AGENT_TEMPERATURE,
+                "max_tokens": config.MISTRAL.MAX_OUTPUT_TOKENS,
+                "messages": [{"role": "system", "content": system}, *map(_to_wire, messages)],
+                "tools": [
+                    {"type": "function", "function": t.model_dump(exclude_none=True)} for t in tools
+                ],
+            },
+        )
+        try:
+            message = data["choices"][0]["message"]
+            calls = [
+                ToolCall(
+                    id=c["id"],
+                    name=c["function"]["name"],
+                    arguments=json.loads(c["function"]["arguments"] or "{}"),
+                )
+                for c in message.get("tool_calls") or []
+            ]
+        except (json.JSONDecodeError, ValidationError, KeyError, TypeError) as e:
+            raise ModelOutputError(f"{self.model} returned a malformed reply") from e
+        usage = data.get("usage") or {}
+        return Reply(
+            text=message.get("content") or None,
+            tool_calls=calls,
+            input_tokens=usage.get("prompt_tokens", 0),
+            output_tokens=usage.get("completion_tokens", 0),
+        )
 
 
 class MistralEmbedder:
@@ -94,3 +131,20 @@ def _post(http: httpx.Client, path: str, body: dict[str, Any]) -> dict[str, Any]
         if attempt < config.MISTRAL.MAX_RETRIES - 1:
             time.sleep(config.MISTRAL.RETRY_WAIT_SECONDS * 2**attempt)
     raise MistralError(f"POST {path} failed after {config.MISTRAL.MAX_RETRIES} tries")
+
+
+def _to_wire(message: Message) -> dict[str, Any]:
+    wire: dict[str, Any] = {"role": message.role, "content": message.content or ""}
+    if message.tool_calls:
+        wire["tool_calls"] = [
+            {
+                "id": c.id,
+                "type": "function",
+                "function": {"name": c.name, "arguments": json.dumps(c.arguments)},
+            }
+            for c in message.tool_calls
+        ]
+    if message.role == "tool":
+        wire["tool_call_id"] = message.tool_call_id
+        wire["name"] = message.name
+    return wire
