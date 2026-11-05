@@ -20,3 +20,15 @@ class DISCOGS:
 
 class DATABASE:
     URL = os.environ.get("DATABASE_URL")
+
+
+class MISTRAL:
+    API_KEY = os.environ.get("MISTRAL_API_KEY")
+    API_URL = "https://api.mistral.ai/v1"
+    CHAT_MODEL = "ministral-8b-2512"
+    EMBED_MODEL = "mistral-embed-2312"
+    EMBED_BATCH_SIZE = 16
+    MAX_OUTPUT_TOKENS = 400
+    TIMEOUT_SECONDS = 60
+    RETRY_WAIT_SECONDS = 2
+    MAX_RETRIES = 5
