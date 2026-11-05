@@ -74,6 +74,16 @@ class CollectionStore(Protocol):
         """Return releases matching the query."""
         ...
 
+    def owned_summaries(
+        self, mood: Mood | None = None, energy: Energy | None = None
+    ) -> list[ReleaseSummary]:
+        """Return every owned release with the given mood and energy, unset meaning any."""
+        ...
+
+    def owned_summary(self, release_id: int) -> ReleaseSummary | None:
+        """Return an owned release, or None if it isn't owned."""
+        ...
+
     def get_release(self, release_id: int) -> Release | None:
         """Return a release with tracks and credits, or None if unknown."""
         ...

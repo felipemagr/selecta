@@ -42,6 +42,13 @@ class Release(BaseModel):
     tracks: list[Track] = []
     credits: list[Credit] = []
 
+    def total_seconds(self) -> int | None:
+        """Return the running time, or None unless every track has a known duration."""
+        durations = [t.duration_seconds for t in self.tracks]
+        if not durations or not all(durations):
+            return None
+        return sum(d for d in durations if d)
+
 
 class ReleaseSummary(BaseModel):
     """The fields needed to mention or pick a release."""
@@ -56,6 +63,7 @@ class ReleaseSummary(BaseModel):
     styles: list[str]
     mood: Mood | None = None
     energy: Energy | None = None
+    duration_seconds: int | None = None
 
 
 class Artist(BaseModel):

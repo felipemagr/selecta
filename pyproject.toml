@@ -51,4 +51,4 @@ type = "layers"
 layers = ["selecta.infrastructure", "selecta.application", "selecta.domain"]
 
 [tool.pytest.ini_options]
-addopts = "-ra -q"
+addopts = "-ra -q --import-mode=importlib"

@@ -38,6 +38,17 @@ class Brief(BaseModel):
             raise ValueError(f"minutes must be between {MIN_MINUTES} and {MAX_MINUTES}")
         return answer
 
+    def values(self) -> dict[str, object]:
+        """Return each slot's value, without the evidence."""
+        return {
+            slot: answer.value if (answer := getattr(self, slot)) else None for slot in SLOT_ORDER
+        }
+
+    def listening_minutes(self) -> int | None:
+        """Return the listening time in minutes, or None if not known."""
+        value = self.minutes.value if self.minutes else None
+        return value if isinstance(value, int) else None
+
     def next_slot(self) -> Slot | None:
         """Return the next slot to ask, or None when complete."""
         return next((slot for slot in SLOT_ORDER if getattr(self, slot) is None), None)

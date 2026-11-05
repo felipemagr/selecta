@@ -52,6 +52,15 @@ class ToolRun(BaseModel):
     result: str
 
 
+class Pick(BaseModel):
+    """The record chosen for the listener, and why."""
+
+    release_id: int
+    title: str
+    artists: list[str]
+    reason: str
+
+
 class Turn(BaseModel):
     """The trace of one listener turn."""
 
@@ -62,11 +71,29 @@ class Turn(BaseModel):
     tool_runs: list[ToolRun] = []
     brief_before: Brief
     brief_after: Brief
+    pick_before: Pick | None = None
+    pick_after: Pick | None = None
     model_rounds: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
     latency_ms: int = 0
     error: str | None = None
+
+
+class Rejection(BaseModel):
+    """A pick the listener turned down, in their words."""
+
+    release_id: int
+    reason: str
+
+
+class Summary(BaseModel):
+    """The end-of-session summary: key points from code, a short text from the model."""
+
+    key_points: dict[str, Any]
+    text: str | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 class Session(BaseModel):
@@ -76,5 +103,12 @@ class Session(BaseModel):
     started_at: datetime
     language: Language = "en"
     brief: Brief = Brief()
+    pick: Pick | None = None
+    rejections: list[Rejection] = []
+    summary: Summary | None = None
     messages: list[Message] = []
     turns: list[Turn] = []
+
+    def rejected_ids(self) -> list[int]:
+        """Return the ids of the records the listener rejected."""
+        return [r.release_id for r in self.rejections]

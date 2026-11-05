@@ -63,19 +63,15 @@ class MistralChat:
 
     def chat(self, system: str, messages: list[Message], tools: list[ToolSpec]) -> Reply:
         """Return the next reply."""
-        data = _post(
-            self._http,
-            "/chat/completions",
-            {
-                "model": self.model,
-                "temperature": config.MISTRAL.AGENT_TEMPERATURE,
-                "max_tokens": config.MISTRAL.MAX_OUTPUT_TOKENS,
-                "messages": [{"role": "system", "content": system}, *map(_to_wire, messages)],
-                "tools": [
-                    {"type": "function", "function": t.model_dump(exclude_none=True)} for t in tools
-                ],
-            },
-        )
+        body: dict[str, Any] = {
+            "model": self.model,
+            "temperature": config.MISTRAL.AGENT_TEMPERATURE,
+            "max_tokens": config.MISTRAL.MAX_OUTPUT_TOKENS,
+            "messages": [{"role": "system", "content": system}, *map(_to_wire, messages)],
+        }
+        if tools:
+            body["tools"] = [{"type": "function", "function": t.model_dump()} for t in tools]
+        data = _post(self._http, "/chat/completions", body)
         try:
             message = data["choices"][0]["message"]
             calls = [
