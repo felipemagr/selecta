@@ -32,3 +32,13 @@ The script finds the token's owner (`/oauth/identity`) and saves:
 | `artists/{id}.json` | `/artists/{id}` | artist profile, members, links |
 
 Discogs allows 60 authenticated requests per minute, so a collection of ~100 records takes a few minutes. The script waits when the budget runs out. Release, master and artist files are cached, so rerunning is a quick resync: it fetches only records added since the last run and deletes files for records you removed. Delete `data/discogs/` to fetch everything again.
+
+## Collection database
+
+The agent searches the collection in PostgreSQL (`compose.yaml` runs it locally with Docker).
+
+```bash
+make index   # starts the database and loads data/discogs/ into it
+```
+
+Rerunning `make index` after `make discogs` makes the database match the collection again: new records are added and removed ones deleted. Text search uses `pg_trgm`, so misspelled names still match. Tests for the database run against it and skip when it isn't running.

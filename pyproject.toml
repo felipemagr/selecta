@@ -7,10 +7,13 @@ license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.28.1",
+    "psycopg[binary]>=3.3.8",
+    "pydantic>=2.14.3",
 ]
 
 [project.scripts]
 selecta-discogs = "selecta.infrastructure.integrations.discogs:main"
+selecta-index = "selecta.infrastructure.entrypoints.cli:index"
 
 [dependency-groups]
 dev = [

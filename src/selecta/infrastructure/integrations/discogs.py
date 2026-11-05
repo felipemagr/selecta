@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import sys
 import time
 from pathlib import Path
@@ -9,9 +10,15 @@ from typing import Any
 
 import httpx
 
+from selecta.domain.collection import Artist, Collection, CollectionItem, Credit, Release, Track
 from selecta.infrastructure import config
 
 logger = logging.getLogger(__name__)
+
+# Discogs disambiguates names as "Name (2)" and marks up profiles as [a=Name], [a123], [b]...[/b].
+_SUFFIX = re.compile(r" \(\d+\)$")
+_MARKUP_LINK = re.compile(r"\[[alm]=([^\]]+)\]")
+_MARKUP_TAG = re.compile(r"\[/?[a-z]+\d*[^\]]*\]")
 
 
 class DiscogsError(Exception):
@@ -144,3 +151,102 @@ def main() -> None:
             export(client, config.DISCOGS.OUT_DIR)
     except DiscogsError as e:
         sys.exit(str(e))
+
+
+class DiscogsExport:
+    """Collection source that reads the files written by `export`."""
+
+    def __init__(self, out_dir: Path) -> None:
+        self._dir = out_dir
+
+    def load(self) -> Collection:
+        """Return the exported collection, with wantlist items as not owned."""
+        if not (self._dir / "collection.json").exists():
+            raise DiscogsError(f"no export in {self._dir}, run `make discogs` first")
+        releases: dict[int, Release] = {}
+        items: dict[int, CollectionItem] = {}
+        for item in _read(self._dir / "collection.json"):
+            # Releases Discogs couldn't return fall back to the list item's summary.
+            data = _read(self._dir / "releases" / f"{item['id']}.json") or item["basic_information"]
+            master = _read(self._dir / "masters" / f"{data.get('master_id')}.json")
+            releases[item["id"]] = _release(data, master.get("year") or None)
+            items.setdefault(item["id"], _item(item, owned=True))
+        for item in _read(self._dir / "wantlist.json"):
+            if item["id"] not in items:
+                releases[item["id"]] = _release(item["basic_information"], None)
+                items[item["id"]] = _item(item, owned=False)
+        artists = [_artist(_read(p)) for p in sorted((self._dir / "artists").glob("*.json"))]
+        return Collection(
+            releases=list(releases.values()), artists=artists, items=list(items.values())
+        )
+
+
+def _read(path: Path) -> Any:
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def _name(artist: dict[str, Any]) -> str:
+    return _SUFFIX.sub("", artist.get("anv") or artist["name"])
+
+
+def _seconds(duration: str) -> int | None:
+    try:
+        return sum(int(p) * 60**i for i, p in enumerate(reversed(duration.split(":"))))
+    except ValueError:
+        return None
+
+
+def _release(data: dict[str, Any], original_year: int | None) -> Release:
+    """Map a full release or a list item's `basic_information`, which lacks tracks and credits."""
+    year = data.get("year") or None
+    fmt = (data.get("formats") or [{}])[0]
+    images = data.get("images") or []
+    cover = next((i["uri"] for i in images if i.get("type") == "primary"), None)
+    entries = [e for t in data.get("tracklist", []) for e in [t, *t.get("sub_tracks", [])]]
+    tracks = [t for t in entries if t.get("type_") == "track"]
+    credits = [*data.get("extraartists", [])]
+    for t in tracks:
+        credits += [
+            {**c, "tracks": c.get("tracks") or t["position"]} for c in t.get("extraartists", [])
+        ]
+    return Release(
+        id=data["id"],
+        title=data["title"],
+        artists=[_name(a) for a in data.get("artists", [])],
+        artist_ids=[a["id"] for a in data.get("artists", [])],
+        year=year,
+        original_year=original_year or year,
+        label=next((lb["name"] for lb in data.get("labels", [])), None),
+        country=data.get("country") or None,
+        format=", ".join([fmt["name"], *fmt.get("descriptions", [])]) if fmt else None,
+        genres=data.get("genres", []),
+        styles=data.get("styles", []),
+        notes=data.get("notes") or None,
+        cover_url=cover or data.get("cover_image"),
+        tracks=[
+            Track(
+                position=t["position"],
+                title=t["title"],
+                duration_seconds=_seconds(t["duration"]) if t.get("duration") else None,
+            )
+            for t in tracks
+        ],
+        credits=[
+            Credit(name=_name(c), role=c["role"], tracks=c.get("tracks", "")) for c in credits
+        ],
+    )
+
+
+def _item(item: dict[str, Any], owned: bool) -> CollectionItem:
+    return CollectionItem(release_id=item["id"], owned=owned, date_added=item.get("date_added"))
+
+
+def _artist(data: dict[str, Any]) -> Artist:
+    profile = _MARKUP_LINK.sub(r"\1", data.get("profile") or "")
+    profile = _MARKUP_TAG.sub("", profile).strip()
+    return Artist(
+        id=data["id"],
+        name=_SUFFIX.sub("", data["name"]),
+        members=[_SUFFIX.sub("", m["name"]) for m in data.get("members", [])],
+        profile=profile or None,
+    )
