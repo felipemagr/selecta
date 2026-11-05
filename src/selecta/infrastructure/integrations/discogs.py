@@ -202,7 +202,7 @@ def _release(data: dict[str, Any], original_year: int | None) -> Release:
         artist_ids=[a["id"] for a in data.get("artists", [])],
         year=year,
         original_year=original_year or year,
-        label=next((lb["name"] for lb in data.get("labels", [])), None),
+        label=next((_SUFFIX.sub("", lb["name"]) for lb in data.get("labels", [])), None),
         country=data.get("country") or None,
         format=", ".join([fmt["name"], *fmt.get("descriptions", [])]) if fmt else None,
         genres=data.get("genres", []),

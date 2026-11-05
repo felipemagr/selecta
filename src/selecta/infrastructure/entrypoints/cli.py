@@ -3,40 +3,63 @@
 import argparse
 import logging
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 import psycopg
 
 from selecta.application.indexing import index_collection
+from selecta.application.retrieval import semantic_search
 from selecta.infrastructure import config
+from selecta.infrastructure.integrations import mistral
 from selecta.infrastructure.integrations.discogs import (
     DiscogsClient,
     DiscogsError,
     DiscogsExport,
     export,
 )
+from selecta.infrastructure.integrations.mistral import MistralChat, MistralEmbedder, MistralError
 from selecta.infrastructure.integrations.postgres import PostgresStore
 
 
-def _export() -> None:
-    if not config.DISCOGS.TOKEN:
-        sys.exit("DISCOGS_TOKEN is not set, see .env.example")
-    with DiscogsClient(config.DISCOGS.TOKEN) as client:
-        export(client, config.DISCOGS.OUT_DIR)
+def _require(name: str, value: str | None) -> str:
+    if not value:
+        sys.exit(f"{name} is not set, see .env.example")
+    return value
 
 
-def _index() -> None:
-    if not config.DATABASE.URL:
-        sys.exit("DATABASE_URL is not set, see .env.example")
-    store = PostgresStore.connect(config.DATABASE.URL)
+@contextmanager
+def _store() -> Iterator[PostgresStore]:
+    store = PostgresStore.connect(_require("DATABASE_URL", config.DATABASE.URL))
     try:
-        index_collection(DiscogsExport(config.DISCOGS.OUT_DIR), store)
+        yield store
     finally:
         store.close()
 
 
-def _sync() -> None:
-    _export()
-    _index()
+def _export(_: argparse.Namespace) -> None:
+    with DiscogsClient(_require("DISCOGS_TOKEN", config.DISCOGS.TOKEN)) as client:
+        export(client, config.DISCOGS.OUT_DIR)
+
+
+def _index(_: argparse.Namespace) -> None:
+    api_key = _require("MISTRAL_API_KEY", config.MISTRAL.API_KEY)
+    with _store() as store, mistral.connect(api_key) as http:
+        source = DiscogsExport(config.DISCOGS.OUT_DIR)
+        index_collection(source, store, MistralChat(http), MistralEmbedder(http))
+
+
+def _sync(args: argparse.Namespace) -> None:
+    _require("MISTRAL_API_KEY", config.MISTRAL.API_KEY)
+    _export(args)
+    _index(args)
+
+
+def _search(args: argparse.Namespace) -> None:
+    api_key = _require("MISTRAL_API_KEY", config.MISTRAL.API_KEY)
+    with _store() as store, mistral.connect(api_key) as http:
+        for p in semantic_search(store, MistralEmbedder(http), args.text, args.limit):
+            print(f"{p.score:.4f}  {p.kind} {p.ref_id}  {p.text[:160]}")
 
 
 def main() -> None:
@@ -45,16 +68,20 @@ def main() -> None:
     commands = parser.add_subparsers(required=True)
     for name, run, text in [
         ("export", _export, "fetch the collection from Discogs into the data directory"),
-        ("index", _index, "load the exported collection into the database"),
+        ("index", _index, "load the export into the database, enrich and embed it"),
         ("sync", _sync, "export, then index"),
+        ("search", _search, "search the collection by meaning"),
     ]:
         commands.add_parser(name, help=text).set_defaults(run=run)
+    search = commands.choices["search"]
+    search.add_argument("text")
+    search.add_argument("--limit", type=int, default=5)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
     try:
-        args.run()
-    except DiscogsError as e:
+        args.run(args)
+    except (DiscogsError, MistralError) as e:
         sys.exit(str(e))
     except psycopg.OperationalError as e:
         sys.exit(f"database unavailable: {e}")

@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from selecta.domain.enrichment import Energy, Mood
+
 
 class Track(BaseModel):
     """One track on a release."""
@@ -52,6 +54,8 @@ class ReleaseSummary(BaseModel):
     format: str | None
     genres: list[str]
     styles: list[str]
+    mood: Mood | None = None
+    energy: Energy | None = None
 
 
 class Artist(BaseModel):

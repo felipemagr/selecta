@@ -38,8 +38,11 @@ Discogs allows 60 authenticated requests per minute, so a collection of ~100 rec
 The agent searches the collection in PostgreSQL (`compose.yaml` runs it locally with Docker).
 
 ```bash
-make index   # starts the database and loads data/discogs/ into it
+make index   # starts the database, loads data/discogs/ into it, enriches and embeds it
 make sync    # export + index, the usual way to pick up changes on Discogs
+uv run --env-file .env selecta search "something calm for a rainy morning"
 ```
 
 `make sync` makes the database match the collection again: new records are added and removed ones deleted. Text search uses `pg_trgm`, so misspelled names still match. Tests for the database run against it and skip when it isn't running.
+
+Indexing needs `MISTRAL_API_KEY`. For each owned record, one Mistral call returns a mood (calm, warm, melancholic, upbeat, intense, dark) and an energy level (low, medium, high), used as filters in structured search. Only Discogs text is embedded, never LLM-written text: each record's facts (artists, title, year, genres, styles, label, notes) and the artist profiles go through `mistral-embed` into pgvector, and `selecta search` ranks them by fusing vector similarity with full-text matches (reciprocal rank fusion). Both steps are cached by a hash of their input, so a rerun only pays for new or changed records. Schema changes are plain SQL files in `integrations/migrations/`, applied once each in name order.
