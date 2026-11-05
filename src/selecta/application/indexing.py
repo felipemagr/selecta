@@ -91,7 +91,7 @@ def _embed(
 
 
 def _release_text(release: Release) -> str:
-    """Return the Discogs facts about a release as one passage, without LLM-written text."""
+    """Return the Discogs facts about a release as one passage."""
     year = release.original_year or release.year
     parts = [
         f"{', '.join(release.artists)} - {release.title}{f' ({year})' if year else ''}.",
@@ -99,8 +99,6 @@ def _release_text(release: Release) -> str:
     ]
     if release.label:
         parts.append(f"{release.label}.")
-    if release.notes:
-        parts.append(release.notes[:MAX_NOTES_CHARS])
     return " ".join(parts)
 
 
