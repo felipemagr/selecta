@@ -1,6 +1,7 @@
 """The `selecta` command."""
 
 import argparse
+import json
 import logging
 import sys
 from collections.abc import Iterator
@@ -9,6 +10,7 @@ from contextlib import contextmanager
 import psycopg
 
 from selecta.application.agent import Agent
+from selecta.application.conversation import Session
 from selecta.application.indexing import index_collection
 from selecta.application.retrieval import semantic_search
 from selecta.application.tools import Tools
@@ -22,6 +24,8 @@ from selecta.infrastructure.integrations.discogs import (
 )
 from selecta.infrastructure.integrations.mistral import MistralChat, MistralEmbedder, MistralError
 from selecta.infrastructure.integrations.postgres import PostgresStore
+
+logger = logging.getLogger(__name__)
 
 
 def _require(name: str, value: str | None) -> str:
@@ -71,8 +75,21 @@ def _chat(_: argparse.Namespace) -> None:
         agent = Agent(model, Tools(store, MistralEmbedder(http)), store)
         session = agent.start()
         print(f"session {session.id}, empty line or Ctrl-D to stop")
-        while text := _read_line():
-            print(f"selecta> {agent.reply(session, text)}")
+        try:
+            while text := _read_line():
+                print(f"selecta> {agent.reply(session, text)}")
+        except KeyboardInterrupt:
+            print()
+        _print_summary(agent, session)
+
+
+def _print_summary(agent: Agent, session: Session) -> None:
+    try:
+        summary = agent.finish(session)
+    except (Exception, KeyboardInterrupt):
+        logger.exception("could not write the summary")
+        return
+    print(json.dumps(summary.model_dump(), indent=2, ensure_ascii=False))
 
 
 def _read_line() -> str:

@@ -10,9 +10,12 @@ from psycopg.types.json import Jsonb
 from selecta.application.conversation import Session
 from selecta.application.ports import Chunk, ChunkKind, CollectionQuery, Passage
 from selecta.domain.collection import Collection, CollectionItem, Release, ReleaseSummary
-from selecta.domain.enrichment import Enrichment
+from selecta.domain.enrichment import Energy, Enrichment, Mood
 
-_SUMMARY_COLUMNS = "id, title, artists, original_year, label, format, genres, styles, mood, energy"
+_SUMMARY_COLUMNS = (
+    "id, title, artists, original_year, label, format, genres, styles, mood, energy, "
+    "duration_seconds"
+)
 _COLUMNS = [
     "id",
     "owned",
@@ -32,6 +35,7 @@ _COLUMNS = [
     "tracks",
     "credits",
     "search_text",
+    "duration_seconds",
 ]
 _SORTS = {
     "oldest": "coalesce(original_year, year) ASC NULLS LAST",
@@ -125,6 +129,25 @@ class PostgresStore:
             query.model_dump(),
         ).fetchall()
         return [ReleaseSummary.model_validate(row) for row in rows]
+
+    def owned_summaries(
+        self, mood: Mood | None = None, energy: Energy | None = None
+    ) -> list[ReleaseSummary]:
+        """Return every owned release with the given mood and energy, unset meaning any."""
+        rows = self._conn.execute(
+            f"SELECT {_SUMMARY_COLUMNS} FROM releases WHERE owned "
+            "AND (%(mood)s::text IS NULL OR mood = %(mood)s) "
+            "AND (%(energy)s::text IS NULL OR energy = %(energy)s) ORDER BY id",
+            {"mood": mood, "energy": energy},
+        ).fetchall()
+        return [ReleaseSummary.model_validate(row) for row in rows]
+
+    def owned_summary(self, release_id: int) -> ReleaseSummary | None:
+        """Return an owned release, or None if it isn't owned."""
+        row = self._conn.execute(
+            f"SELECT {_SUMMARY_COLUMNS} FROM releases WHERE owned AND id = %s", [release_id]
+        ).fetchone()
+        return ReleaseSummary.model_validate(row) if row else None
 
     def get_release(self, release_id: int) -> Release | None:
         """Return a release with tracks and credits, or None if unknown."""
@@ -239,6 +262,7 @@ def _release_row(release: Release, item: CollectionItem) -> dict[str, Any]:
     row = {**release.model_dump(mode="json"), "owned": item.owned, "date_added": item.date_added}
     row["tracks"] = Jsonb(row["tracks"])
     row["credits"] = Jsonb(row["credits"])
+    row["duration_seconds"] = release.total_seconds()
     row["search_text"] = " ".join(
         [
             release.title,

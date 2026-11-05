@@ -119,3 +119,26 @@ def test_session_round_trips(store: PostgresStore) -> None:
     store.save_session(session)
 
     assert store.load_session("s1") == session
+
+
+def test_duration_is_known_only_when_every_track_has_one(store: PostgresStore) -> None:
+    full = _release(1, "A", 1970)
+    tracks = [Track(position="A1", title="x", duration_seconds=60), Track(position="A2", title="y")]
+    partial = _release(2, "B", 1970).model_copy(update={"tracks": tracks})
+    store.replace(_collection(full, partial))
+
+    durations = {r.id: r.duration_seconds for r in store.search(CollectionQuery())}
+
+    assert durations == {1: 300, 2: None}
+
+
+def test_owned_summaries_filter_by_mood_and_skip_the_wantlist(store: PostgresStore) -> None:
+    store.replace(
+        _collection(_release(1, "A", 1970), _release(2, "B", 1970), wanted=_release(3, "C", 1970))
+    )
+    store.save_enrichment(1, Enrichment(mood="calm", energy="low"), "h")
+    store.save_enrichment(3, Enrichment(mood="calm", energy="low"), "h")
+
+    assert [r.id for r in store.owned_summaries(mood="calm")] == [1]
+    assert [r.id for r in store.owned_summaries()] == [1, 2]
+    assert store.owned_summary(3) is None
