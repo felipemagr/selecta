@@ -21,12 +21,14 @@ from selecta.application.ports import (
     CollectionQuery,
     CollectionStore,
     Embedder,
+    PlaybackResult,
     RerankError,
     WebSearchError,
 )
 from selecta.application.retrieval import semantic_search
 from selecta.domain.brief import OPTIONAL_SLOTS, SLOT_ORDER, Answer, Brief, Occasion
 from selecta.domain.enrichment import Energy, Mood
+from selecta.domain.library import PlayableTrack
 from selecta.domain.picking import MUCH_LONGER_FACTOR, runs_past
 
 logger = logging.getLogger(__name__)
@@ -116,7 +118,10 @@ SPECS = [
         description="Get one record's full details: tracklist, credits, label, year and notes.",
         parameters={
             "type": "object",
-            "properties": {"release_id": {"type": "integer"}},
+            "properties": {
+                "release_id": {"type": "integer"},
+                "track": {"type": "string", "description": "Track to start from."},
+            },
             "required": ["release_id"],
         },
     ),
@@ -157,8 +162,8 @@ SPECS = [
         description=(
             "Choose the record for the listener. Call it before you announce a pick: only a pick "
             "this tool accepted may be announced. Usually one of the candidates in the interview "
-            "state; any owned record if the listener asks for it by name. Only one record is "
-            "picked at a time."
+            "state; any owned record the listener asks for by name, at any point. Only one "
+            "record is picked at a time."
         ),
         parameters={
             "type": "object",
@@ -178,7 +183,23 @@ SPECS = [
         description="Record that the listener turned down the current pick.",
         parameters={"type": "object", "properties": {}},
     ),
+    ToolSpec(
+        name="play_record",
+        description=(
+            "Play a record on the listener's speakers: the current pick once they want to hear "
+            "it, or a record they name, right away and with no questions first. A record not "
+            "picked yet is picked first. Use an id from the candidates or from "
+            "search_collection. Returns whether it started: say it's playing only after that."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {"release_id": {"type": "integer"}},
+            "required": ["release_id"],
+        },
+    ),
 ]
+
+Play = Callable[[list[PlayableTrack]], PlaybackResult]
 
 
 class Tools:
@@ -191,21 +212,28 @@ class Tools:
         self._embedder = embedder
         self._lookup = lookup
 
-    @property
-    def specs(self) -> list[ToolSpec]:
-        """Return the tools the model may call: look_up only when web lookup is set up."""
-        return [s for s in SPECS if s.name != "look_up" or self._lookup is not None]
+    def specs(self, can_play: bool) -> list[ToolSpec]:
+        """Return the tools the model may call: look_up and play_record only when set up."""
+        unavailable = {"look_up"} if self._lookup is None else set()
+        if not can_play:
+            unavailable.add("play_record")
+        return [s for s in SPECS if s.name not in unavailable]
 
     def candidates(self, session: Session) -> Candidates:
         """Return the records the agent may pick from now."""
         return find_candidates(self._store, session)
 
     def run(
-        self, call: ToolCall, session: Session, before_search: Callable[[], None] = lambda: None
+        self,
+        call: ToolCall,
+        session: Session,
+        before_search: Callable[[], None] = lambda: None,
+        play: Play | None = None,
     ) -> str:
         """Return the result of a tool call. Failures are returned too, never raised.
 
         `before_search` runs right before a slow web search, so the listener can be told to wait.
+        `play` sends tracks to the listener's player and returns what the player reported.
         """
         args = call.arguments
         try:
@@ -225,6 +253,9 @@ class Tools:
                     return self._pick(session, int(args["release_id"]), args["reason"], asked)
                 case "reject_pick":
                     return _reject(session)
+                case "play_record" if play:
+                    track = str(args["track"]) if args.get("track") else None
+                    return self._play(session, int(args["release_id"]), play, track)
                 case "look_up":
                     release_id, question = int(args["release_id"]), str(args["question"])
                     return self._look_up(release_id, question, before_search)
@@ -238,6 +269,31 @@ class Tools:
         except Exception:
             logger.exception("tool %s failed", call.name)
             return f"{call.name} failed. Tell the listener you can't check that right now."
+
+    def _play(self, session: Session, release_id: int, play: Play, track: str | None = None) -> str:
+        """Play the record from the given track, picking it first if it isn't the current pick."""
+        if self._store.owned_summary(release_id) is None:
+            return "That isn't one of the listener's records. Find it with search_collection."
+        tracks = self._store.playable(release_id)
+        if not tracks:
+            return "That record isn't on the music server, only on vinyl. Tell the listener."
+        if track:
+            start = _track_index(tracks, track)
+            if start is None:
+                return f"There's no track {track} on the server for that record. Tell the listener."
+            tracks = tracks[start:]
+        picked = ""
+        if session.pick is None or session.pick.release_id != release_id:
+            picked = self._pick(session, release_id, "They asked to hear it.", asked_by_name=True)
+            if session.pick is None or session.pick.release_id != release_id:
+                return picked
+        match play(tracks):
+            case "playing":
+                return f"{picked} Playing: {len(tracks)} tracks, from {tracks[0].title}.".strip()
+            case "cancelled":
+                return "The listener spoke over you, so it wasn't started. Listen to them first."
+            case _:
+                return "The player didn't start. Tell the listener it can't play right now."
 
     def _look_up(self, release_id: int, question: str, before_search: Callable[[], None]) -> str:
         if self._lookup is None:
@@ -259,28 +315,41 @@ class Tools:
         )
 
     def _pick(self, session: Session, release_id: int, reason: str, asked_by_name: bool) -> str:
-        if session.pick:
-            return (
-                "A record is already picked. Keep it, unless the listener turned it down: then "
-                "call reject_pick."
-            )
+        release = self._store.owned_summary(release_id)
+        if release is None:
+            return "That record isn't in the listener's collection. Pick another."
+        replaced = session.pick
         if not asked_by_name:
+            if session.pick:
+                return (
+                    "A record is already picked. Keep it, unless the listener turned it down: "
+                    "then call reject_pick."
+                )
             if session.brief.next_slot():
                 return "Finish the interview first, unless the listener asked for a record by name."
             if release_id in session.rejected_ids():
                 return "The listener already rejected that record. Pick another."
             if release_id not in {r.id for r in self.candidates(session).releases}:
                 return "Pick from the candidates, unless the listener asked for a record by name."
-        release = self._store.owned_summary(release_id)
-        if release is None:
-            return "That record isn't in the listener's collection. Pick another."
         session.pick = Pick(
             release_id=release.id, title=release.title, artists=release.artists, reason=reason
         )
         minutes = session.brief.listening_minutes()
+        note = f" It replaces {replaced.title}." if replaced else ""
         if runs_past(release.duration_seconds, minutes, MUCH_LONGER_FACTOR):
-            return f"Picked. {MUCH_LONGER_NOTE}"
-        return "Picked."
+            return f"Picked.{note} {MUCH_LONGER_NOTE}"
+        return f"Picked.{note}"
+
+
+def _track_index(tracks: list[PlayableTrack], track: str) -> int | None:
+    """Return where to start: a vinyl position (B1) or a track number (3) among those that play."""
+    wanted = track.strip().upper()
+    for i, t in enumerate(tracks):
+        if t.position.upper() == wanted:
+            return i
+    if wanted.isdigit() and 1 <= int(wanted) <= len(tracks):
+        return int(wanted) - 1
+    return None
 
 
 def _reject(session: Session) -> str:

@@ -130,17 +130,17 @@ def test_every_search_failing_raises() -> None:
 
 def test_artist_sites_come_first_without_social_media_or_duplicates() -> None:
     urls = [
-        "https://www.kraftwerk.com/",
-        "https://en.wikipedia.org/wiki/Kraftwerk",
-        "https://www.facebook.com/kraftwerk",
-        "https://m.facebook.com/kraftwerk",
+        "https://www.robotsband.com/",
+        "https://en.wikipedia.org/wiki/Robotsband",
+        "https://www.facebook.com/robotsband",
+        "https://m.facebook.com/robotsband",
         "https://open.spotify.com/artist/x",
-        "http://kraftwerk.com:8080/concerts",
-        "allmusic.com/artist/kraftwerk",
+        "http://robotsband.com:8080/concerts",
+        "allmusic.com/artist/robotsband",
     ]
 
     assert source_domains(urls) == [
-        "kraftwerk.com",
+        "robotsband.com",
         "allmusic.com",
         "wikipedia.org",
         "bandcamp.com",

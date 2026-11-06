@@ -13,7 +13,7 @@ from selecta.application.picking import describe
 from selecta.application.ports import AgentModel, ModelError, SessionStore
 from selecta.application.prompts import FALLBACK_REPLIES, PERSONA, SUMMARY, WAIT_LINES
 from selecta.application.speech import SentenceStream
-from selecta.application.tools import Tools
+from selecta.application.tools import Play, Tools
 from selecta.domain.brief import SLOT_ORDER
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,11 @@ class Agent:
         return session
 
     def reply(
-        self, session: Session, text: str, say: Callable[[str], None] = lambda _: None
+        self,
+        session: Session,
+        text: str,
+        say: Callable[[str], None] = lambda _: None,
+        play: Play | None = None,
     ) -> str:
         """Return the reply to one listener turn, and save the session."""
         started = time.monotonic()
@@ -57,7 +61,7 @@ class Agent:
             pick_before=session.pick,
         )
         session.messages.append(Message(role="user", content=text))
-        turn.reply = self._run_rounds(session, turn, say)
+        turn.reply = self._run_rounds(session, turn, say, play)
         turn.brief_after = session.brief.model_copy(deep=True)
         turn.pick_after = session.pick
         turn.latency_ms = round((time.monotonic() - started) * 1000)
@@ -65,7 +69,9 @@ class Agent:
         self._store.save_session(session)
         return turn.reply
 
-    def _run_rounds(self, session: Session, turn: Turn, say: Callable[[str], None]) -> str:
+    def _run_rounds(
+        self, session: Session, turn: Turn, say: Callable[[str], None], play: Play | None
+    ) -> str:
         spoken: list[str] = []
 
         def speak(line: str) -> None:
@@ -79,7 +85,7 @@ class Agent:
                 state, key = self._state(session), new_key
             turn.contexts.append(state)
             stream = SentenceStream(speak)
-            system, specs = f"{PERSONA}\n\n{state}", self._tools.specs
+            system, specs = f"{PERSONA}\n\n{state}", self._tools.specs(can_play=play is not None)
             try:
                 reply = self._model.chat(system, session.messages, specs, stream.feed)
             except ModelError as e:
@@ -113,7 +119,7 @@ class Agent:
                 speak(turn.said_while_waiting)
 
             runs = [
-                ToolRun(call=call, result=self._tools.run(call, session, before_search))
+                ToolRun(call=call, result=self._tools.run(call, session, before_search, play))
                 for call in reply.tool_calls
             ]
             turn.tool_runs += runs
@@ -192,7 +198,8 @@ class Agent:
             )
         if session.hurried:
             lines.append("The listener is in a hurry: no more questions, one-sentence replies.")
-        if slot := brief.next_slot():
+        slot = brief.next_slot()
+        if slot and not session.pick:
             lines.append(f"Next to ask: {slot}.")
         elif not session.pick:
             lines.append("The interview is complete.")

@@ -214,6 +214,7 @@ def _release(data: dict[str, Any], original_year: int | None) -> Release:
                 position=t["position"],
                 title=t["title"],
                 duration_seconds=_seconds(t["duration"]) if t.get("duration") else None,
+                artists=[_name(a) for a in t.get("artists", [])],
             )
             for t in tracks
         ],

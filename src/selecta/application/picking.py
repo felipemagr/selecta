@@ -27,7 +27,7 @@ class Candidates(BaseModel):
 
 
 def find_candidates(store: CollectionStore, session: Session) -> Candidates:
-    """Return owned records matching the brief, minus the ones rejected in this session.
+    """Return owned records on the music server matching the brief, minus this session's rejections.
 
     If the listener wants whole albums, records known to run past their time are left out.
     With too few matches, energy then mood are relaxed; stricter matches stay first. Each step is
@@ -50,7 +50,7 @@ def find_candidates(store: CollectionStore, session: Session) -> Candidates:
         minutes = brief.listening_minutes() if brief.wants_whole_album() else None
         found = [
             r
-            for r in store.owned_summaries(**filters)
+            for r in store.owned_summaries(**filters, playable=True)
             if r.id not in taken and not runs_past(r.duration_seconds, minutes)
         ]
         random.Random(session.id).shuffle(found)
@@ -78,6 +78,8 @@ def describe(candidates: Candidates, session: Session) -> str:
         feel = f"{r.mood}/{r.energy or 'energy not tagged'}" if r.mood else "mood not tagged"
         long = runs_past(r.duration_seconds, minutes, MUCH_LONGER_FACTOR)
         notes = [MUCH_LONGER_NOTE] if long else []
+        if r.playable_count < r.track_count:
+            notes.append(f"Only {r.playable_count} of its {r.track_count} tracks can be played.")
         if recalled := memory.get(r.id):
             notes.append(note(recalled))
         artists = ", ".join(r.artists)

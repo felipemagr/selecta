@@ -9,9 +9,19 @@ from dataclasses import dataclass
 
 from selecta.application.agent import Agent
 from selecta.application.conversation import Session, Spoken
-from selecta.application.ports import SessionStore, SpeechError, SpeechToText, TextToSpeech
+from selecta.application.ports import (
+    PlaybackResult,
+    SessionStore,
+    SpeechError,
+    SpeechToText,
+    TextToSpeech,
+)
+from selecta.domain.library import PlayableTrack
 
 logger = logging.getLogger(__name__)
+
+# How long the player has to start a record before the agent says it can't.
+PLAYER_TIMEOUT_SECONDS = 10
 
 
 @dataclass
@@ -44,11 +54,23 @@ class Problem:
 
 
 @dataclass
+class Play:
+    """Tracks for the player to play in order, each by its song id."""
+
+    song_ids: list[str]
+
+
+@dataclass
+class StopMusic:
+    """The player should stop the record."""
+
+
+@dataclass
 class Done:
     """The turn is over."""
 
 
-Event = Transcript | Line | Audio | Problem | Done
+Event = Transcript | Line | Audio | Problem | Play | StopMusic | Done
 
 
 class VoiceSession:
@@ -73,6 +95,8 @@ class VoiceSession:
         self._lines: list[str] = []
         self._first_audio_ms: int | None = None
         self._spoken_turn: int | None = None
+        self._player: asyncio.Future[PlaybackResult] | None = None
+        self._turns = 0
 
     async def turn(
         self,
@@ -86,6 +110,8 @@ class VoiceSession:
         finished playing. The previous agent call may still be running; it is awaited after the
         utterance is recorded and transcribed.
         """
+        self._turns += 1
+        this_turn = self._turns
         language = self.session.language if self.session.turns else None
         pcm = b"".join([chunk async for chunk in audio])
         try:
@@ -111,9 +137,16 @@ class VoiceSession:
         def say(line: str) -> None:
             loop.call_soon_threadsafe(queue.put_nowait, line)
 
+        def play(tracks: list[PlayableTrack]) -> PlaybackResult:
+            # A turn the listener cut off must not start its record.
+            if this_turn != self._turns:
+                return "cancelled"
+            started = asyncio.run_coroutine_threadsafe(self._play(tracks, emit), loop)
+            return started.result()
+
         def run() -> str:
             try:
-                return self._agent.reply(self.session, text, say=say)
+                return self._agent.reply(self.session, text, say=say, play=play)
             finally:
                 loop.call_soon_threadsafe(queue.put_nowait, None)
 
@@ -152,6 +185,25 @@ class VoiceSession:
         if final.role == "assistant" and not final.tool_calls and not final.content:
             final.content = "(The listener cut this reply off unheard.)"
         await self._save()
+
+    def player_said(self, result: PlaybackResult) -> None:
+        """Pass on what the player reported after a Play: it started, or it failed."""
+        if self._player and not self._player.done():
+            self._player.set_result(result)
+
+    async def _play(
+        self, tracks: list[PlayableTrack], emit: Callable[[Event], Awaitable[None]]
+    ) -> PlaybackResult:
+        """Send the tracks to the player and wait until it says whether it started."""
+        self._player = asyncio.get_running_loop().create_future()
+        await emit(Play([t.song_id for t in tracks]))
+        try:
+            return await asyncio.wait_for(self._player, PLAYER_TIMEOUT_SECONDS)
+        except TimeoutError:
+            logger.warning("the player didn't answer")
+            # It may still start later, after the agent said it couldn't.
+            await emit(StopMusic())
+            return "failed"
 
     async def close(self) -> None:
         """Wait for the last turn, then write the session summary."""

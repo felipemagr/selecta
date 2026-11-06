@@ -6,8 +6,8 @@ from selecta.application.speech import SentenceStream, sentences
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
-        ("Atmospherica Vol. 2. It's calm.", ["Atmospherica Vol. 2.", "It's calm."]),
-        ("**Pink Moon** it is! ¿Te gusta?", ["Pink Moon it is!", "¿Te gusta?"]),
+        ("Waves Vol. 2. It's calm.", ["Waves Vol. 2.", "It's calm."]),
+        ("**Blue Harbour** it is! ¿Te gusta?", ["Blue Harbour it is!", "¿Te gusta?"]),
     ],
 )
 def test_sentences_split_for_speech_without_markup(text: str, expected: list[str]) -> None:

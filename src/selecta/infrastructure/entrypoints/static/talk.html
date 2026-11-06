@@ -68,6 +68,10 @@ function onMessage(message) {
     reply = reply || note("selecta", "");
     reply.textContent += (reply.textContent ? " " : "") + event.text;
     status.textContent = "Speaking. Press to interrupt.";
+  } else if (event.type === "play") {
+    playTracks(event.tracks);
+  } else if (event.type === "stop_music") {
+    queue = []; music.pause();
   } else if (event.type === "problem") {
     note("problem", event.text);
   } else if (event.type === "done") {
@@ -90,6 +94,35 @@ function play(samples) {
 }
 
 function playing() { return ctx && nextStart > ctx.currentTime; }
+
+// The record: tracks play in order; the server hears once whether it started.
+const music = new Audio();
+let queue = [], reported = false, record = 0;
+
+function report(type) {
+  if (reported) return;
+  reported = true;
+  ws.send(JSON.stringify({ type }));
+}
+
+function playTracks(urls) {
+  queue = urls.slice(); reported = false; record += 1; nextTrack();
+}
+
+function nextTrack() {
+  const url = queue.shift();
+  if (!url) return;
+  const mine = record;
+  music.src = url;
+  // A start that fails after another record replaced this one isn't that record's failure.
+  music.play().catch(() => { if (mine === record) report("play_failed"); });
+}
+
+music.addEventListener("playing", () => report("play_started"));
+music.addEventListener("ended", nextTrack);
+music.addEventListener("error", () => { if (reported) nextTrack(); else report("play_failed"); });
+// The music steps back while the listener talks or the agent speaks.
+setInterval(() => { music.volume = held || playing() ? 0.2 : 1; }, 200);
 
 function stopPlayback() {
   (play.sources || []).forEach(s => { try { s.stop(); } catch (_) {} });

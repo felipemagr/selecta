@@ -11,10 +11,13 @@ from selecta.application.ports import (
     CollectionStore,
     Embedder,
     ModelOutputError,
+    MusicLibrary,
+    MusicLibraryError,
 )
 from selecta.application.prompts import MOOD_ENRICH
 from selecta.domain.collection import Artist, Release
 from selecta.domain.enrichment import Enrichment
+from selecta.domain.library import SongIndex, playable_tracks
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +27,16 @@ MAX_TRACKS = 20
 
 
 def index_collection(
-    source: CollectionSource, store: CollectionStore, chat: ChatModel, embedder: Embedder
+    source: CollectionSource,
+    store: CollectionStore,
+    chat: ChatModel,
+    embedder: Embedder,
+    library: MusicLibrary | None = None,
 ) -> None:
     """Replace the stored collection with the source's, then enrich and embed what changed.
 
     Results are cached by input hash, so a rerun only calls the models for new or changed text.
+    With a `library`, each owned record is also matched to the songs that can be played.
     """
     collection = source.load()
     store.replace(collection)
@@ -39,8 +47,36 @@ def index_collection(
     releases = [r for r in collection.releases if r.id in owned]
     artist_ids = {a for r in releases for a in r.artist_ids}
     artists = [a for a in collection.artists if a.id in artist_ids]
+    if library:
+        _match_playable(releases, store, library)
     _enrich(releases, artists, store, chat)
     _embed(releases, artists, store, embedder)
+
+
+def _match_playable(releases: list[Release], store: CollectionStore, library: MusicLibrary) -> None:
+    try:
+        songs = library.songs()
+    except MusicLibraryError as e:
+        logger.warning("music server unreachable, playable tracks left as they were: %s", e)
+        return
+    if not songs:
+        # More likely a rescan in progress than an empty library: keep what was matched.
+        logger.warning("the music server listed no songs, playable tracks left as they were")
+        return
+    index = SongIndex(songs)
+    full = partial = 0
+    for release in releases:
+        tracks = playable_tracks(release, index)
+        store.save_playable(release.id, tracks)
+        full += bool(tracks) and len(tracks) == len(release.tracks)
+        partial += bool(tracks) and len(tracks) < len(release.tracks)
+    logger.info(
+        "playable: %d complete, %d partly, %d only on vinyl (%d songs on the server)",
+        full,
+        partial,
+        len(releases) - full - partial,
+        len(songs),
+    )
 
 
 def _enrich(

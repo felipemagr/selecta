@@ -8,6 +8,7 @@ import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+import httpx
 import psycopg
 import uvicorn
 
@@ -20,7 +21,7 @@ from selecta.application.tools import Tools
 from selecta.application.voice import VoiceSession
 from selecta.infrastructure import config
 from selecta.infrastructure.entrypoints.server import create_app
-from selecta.infrastructure.integrations import cohere, mistral, tavily, voxtral
+from selecta.infrastructure.integrations import cohere, mistral, navidrome, tavily, voxtral
 from selecta.infrastructure.integrations.cohere import CohereReranker
 from selecta.infrastructure.integrations.discogs import (
     DiscogsClient,
@@ -29,6 +30,7 @@ from selecta.infrastructure.integrations.discogs import (
     export,
 )
 from selecta.infrastructure.integrations.mistral import MistralChat, MistralEmbedder, MistralError
+from selecta.infrastructure.integrations.navidrome import NavidromeError, NavidromeLibrary
 from selecta.infrastructure.integrations.postgres import PostgresStore
 from selecta.infrastructure.integrations.tavily import TavilySearch
 from selecta.infrastructure.integrations.voxtral import VoxtralSpeaker, VoxtralTranscriber
@@ -64,6 +66,18 @@ def _lookup(store: PostgresStore) -> Iterator[Lookup | None]:
         yield Lookup(store, TavilySearch(web), CohereReranker(rerank))
 
 
+@contextmanager
+def _library() -> Iterator[NavidromeLibrary | None]:
+    if not config.NAVIDROME.URL:
+        logger.warning("NAVIDROME_URL is not set, nothing will be playable")
+        yield None
+        return
+    _require("NAVIDROME_USER", config.NAVIDROME.USER)
+    _require("NAVIDROME_PASSWORD", config.NAVIDROME.PASSWORD)
+    with navidrome.connect() as http:
+        yield NavidromeLibrary(http)
+
+
 def _export(_: argparse.Namespace) -> None:
     with DiscogsClient(_require("DISCOGS_TOKEN", config.DISCOGS.TOKEN)) as client:
         export(client, config.DISCOGS.OUT_DIR)
@@ -71,9 +85,9 @@ def _export(_: argparse.Namespace) -> None:
 
 def _index(_: argparse.Namespace) -> None:
     api_key = _require("MISTRAL_API_KEY", config.MISTRAL.API_KEY)
-    with _store() as store, mistral.connect(api_key) as http:
+    with _store() as store, mistral.connect(api_key) as http, _library() as library:
         source = DiscogsExport(config.DISCOGS.OUT_DIR)
-        index_collection(source, store, MistralChat(http), MistralEmbedder(http))
+        index_collection(source, store, MistralChat(http), MistralEmbedder(http), library)
 
 
 def _sync(args: argparse.Namespace) -> None:
@@ -110,7 +124,17 @@ def _serve(_: argparse.Namespace) -> None:
             tts = VoxtralSpeaker(speech)
             return VoiceSession(agent, stt, tts, store, session)
 
-        uvicorn.run(create_app(open_session), host=config.SERVER.HOST, port=config.SERVER.PORT)
+        # A song can stream for many minutes, but a dead server should fail fast.
+        timeout = httpx.Timeout(config.NAVIDROME.TIMEOUT_SECONDS, read=None)
+        music = httpx.AsyncClient(timeout=timeout)
+
+        async def open_song(song_id: str, byte_range: str | None) -> httpx.Response:
+            if not await asyncio.to_thread(store.has_song, song_id):
+                raise NavidromeError(f"{song_id} isn't one of the collection's songs")
+            return await navidrome.open_stream(music, song_id, byte_range)
+
+        app = create_app(open_session, open_song if config.NAVIDROME.URL else None)
+        uvicorn.run(app, host=config.SERVER.HOST, port=config.SERVER.PORT)
 
 
 def _talk(agent: Agent) -> None:

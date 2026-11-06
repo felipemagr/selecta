@@ -1,6 +1,7 @@
 import json
 from collections.abc import AsyncIterator, Awaitable, Callable
 
+import httpx
 from fastapi.testclient import TestClient
 
 from selecta.application.voice import Audio, Done, Event, Line, Transcript
@@ -12,6 +13,10 @@ class FakeVoice:
         self.heard: list[bytes] = []
         self.cut_offs: list[int | None] = []
         self.closed = False
+        self.player: list[str] = []
+
+    def player_said(self, result: str) -> None:
+        self.player.append(result)
 
     async def turn(
         self,
@@ -34,7 +39,12 @@ def _client(voice: FakeVoice) -> TestClient:
     async def open_session() -> FakeVoice:
         return voice
 
-    return TestClient(create_app(open_session))  # type: ignore[arg-type]
+    async def open_song(song_id: str, byte_range: str | None) -> httpx.Response:
+        headers = {"content-type": "audio/flac"}
+        body = httpx.ByteStream(b"flac " + song_id.encode())
+        return httpx.Response(200, stream=body, headers=headers)
+
+    return TestClient(create_app(open_session, open_song))  # type: ignore[arg-type]
 
 
 def test_push_to_talk_round_trip() -> None:
@@ -69,3 +79,18 @@ def test_pressing_while_the_agent_speaks_records_what_was_heard() -> None:
 
 def test_page_is_served() -> None:
     assert "Hold to talk" in _client(FakeVoice()).get("/").text
+
+
+def test_songs_stream_through_the_server() -> None:
+    response = _client(FakeVoice()).get("/stream/s1")
+
+    assert response.headers["content-type"] == "audio/flac" and response.content == b"flac s1"
+
+
+def test_player_reports_reach_the_session() -> None:
+    voice = FakeVoice()
+    with _client(voice).websocket_connect("/talk") as ws:
+        ws.send_text(json.dumps({"type": "play_started"}))
+        ws.send_text(json.dumps({"type": "play_failed"}))
+
+    assert voice.player == ["playing", "failed"]

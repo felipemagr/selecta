@@ -2,6 +2,9 @@ import asyncio
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 
+import pytest
+
+import selecta.application.voice as voice_module
 from selecta.application.agent import Agent
 from selecta.application.conversation import Message, Reply, Session, ToolSpec
 from selecta.application.ports import SpeechError
@@ -11,10 +14,13 @@ from selecta.application.voice import (
     Done,
     Event,
     Line,
+    Play,
     Problem,
+    StopMusic,
     Transcript,
     VoiceSession,
 )
+from selecta.domain.library import PlayableTrack
 
 
 class ScriptedModel:
@@ -162,3 +168,25 @@ def test_cut_off_matches_lines_that_start_with_a_number() -> None:
 
     replies = [m.content for m in voice.session.messages if m.role == "assistant"]
     assert replies == ["Here's Album 1! 2 sides, 40 minutes.", "Okay."]
+
+
+def test_player_answer_is_passed_back_and_silence_means_failed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    voice = _voice(Ears("hi"))
+    sent: list[Event] = []
+
+    async def emit(event: Event) -> None:
+        sent.append(event)
+
+    async def scenario() -> tuple[str, str]:
+        track = PlayableTrack(position="A1", title="T", song_id="s1")
+        answered = asyncio.create_task(voice._play([track], emit))
+        await asyncio.sleep(0)
+        voice.player_said("playing")
+        monkeypatch.setattr(voice_module, "PLAYER_TIMEOUT_SECONDS", 0.01)
+        silent = await voice._play([track], emit)
+        return await answered, silent
+
+    assert asyncio.run(scenario()) == ("playing", "failed")
+    assert sent == [Play(["s1"]), Play(["s1"]), StopMusic()]
