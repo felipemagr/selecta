@@ -12,6 +12,7 @@ Slot = Literal["mood", "energy", "minutes", "occasion"]
 MIN_MINUTES = 5
 MAX_MINUTES = 240
 SLOT_ORDER: tuple[Slot, ...] = ("mood", "energy", "minutes", "occasion")
+OPTIONAL_SLOTS = ("whole_album",)
 
 
 class Answer[T](BaseModel):
@@ -28,6 +29,7 @@ class Brief(BaseModel):
     energy: Answer[Energy] | None = None
     minutes: Answer[int | Literal["UNKNOWN"]] | None = None
     occasion: Answer[Occasion] | None = None
+    whole_album: Answer[bool] | None = None
 
     @field_validator("minutes")
     @classmethod
@@ -41,13 +43,18 @@ class Brief(BaseModel):
     def values(self) -> dict[str, object]:
         """Return each slot's value, without the evidence."""
         return {
-            slot: answer.value if (answer := getattr(self, slot)) else None for slot in SLOT_ORDER
+            slot: answer.value if (answer := getattr(self, slot)) else None
+            for slot in (*SLOT_ORDER, *OPTIONAL_SLOTS)
         }
 
     def listening_minutes(self) -> int | None:
         """Return the listening time in minutes, or None if not known."""
         value = self.minutes.value if self.minutes else None
         return value if isinstance(value, int) else None
+
+    def wants_whole_album(self) -> bool:
+        """Return whether the listener said they want the whole album, not one side."""
+        return bool(self.whole_album and self.whole_album.value)
 
     def next_slot(self) -> Slot | None:
         """Return the next slot to ask, or None when complete."""

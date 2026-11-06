@@ -1,5 +1,6 @@
 """Interfaces the application needs from the outside world."""
 
+from datetime import datetime
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, Field
@@ -220,4 +221,8 @@ class SessionStore(Protocol):
 
     def load_session(self, session_id: str) -> Session | None:
         """Return a session, or None if unknown."""
+        ...
+
+    def sessions_since(self, since: datetime) -> list[Session]:
+        """Return the sessions started at or after `since`, oldest first, without their turns."""
         ...

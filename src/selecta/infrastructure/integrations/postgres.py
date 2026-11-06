@@ -1,5 +1,6 @@
 """Collection and session store on PostgreSQL."""
 
+from datetime import datetime
 from importlib.resources import files
 from typing import Any
 
@@ -315,6 +316,15 @@ class PostgresStore:
             "SELECT document FROM sessions WHERE id = %s", [session_id]
         ).fetchone()
         return Session.model_validate(row["document"]) if row else None
+
+    def sessions_since(self, since: datetime) -> list[Session]:
+        """Return the sessions started at or after `since`, oldest first, without their turns."""
+        rows = self._conn.execute(
+            "SELECT document - 'messages' - 'turns' AS document FROM sessions "
+            "WHERE started_at >= %s ORDER BY started_at",
+            [since],
+        ).fetchall()
+        return [Session.model_validate(r["document"]) for r in rows]
 
 
 def _migrate(conn: psycopg.Connection) -> None:

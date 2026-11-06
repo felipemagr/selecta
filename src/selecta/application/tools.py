@@ -16,7 +16,7 @@ from selecta.application.conversation import (
     ToolSpec,
 )
 from selecta.application.lookup import Lookup
-from selecta.application.picking import FIT_NOTES, Candidates, find_candidates
+from selecta.application.picking import MUCH_LONGER_NOTE, Candidates, find_candidates
 from selecta.application.ports import (
     CollectionQuery,
     CollectionStore,
@@ -25,9 +25,9 @@ from selecta.application.ports import (
     WebSearchError,
 )
 from selecta.application.retrieval import semantic_search
-from selecta.domain.brief import SLOT_ORDER, Brief, Occasion
+from selecta.domain.brief import OPTIONAL_SLOTS, SLOT_ORDER, Answer, Brief, Occasion
 from selecta.domain.enrichment import Energy, Mood
-from selecta.domain.picking import fit
+from selecta.domain.picking import MUCH_LONGER_FACTOR, runs_past
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +64,28 @@ SPECS = [
                     }
                 ),
                 "occasion": _answer({"enum": list(get_args(Occasion))}),
+                "whole_album": _answer(
+                    {
+                        "type": "boolean",
+                        "description": "True if they want the whole album, not just one side.",
+                    }
+                ),
                 "language": {"enum": list(get_args(Language))},
             },
             "required": ["language"],
+        },
+    ),
+    ToolSpec(
+        name="skip_questions",
+        description=(
+            "Stop the interview when the listener wants you to just pick, or is getting "
+            "impatient with the questions. Pass their words. The slots not answered yet are "
+            "saved as UNKNOWN and the candidates appear."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {"evidence": {"type": "string", "description": "The listener's words."}},
+            "required": ["evidence"],
         },
     ),
     ToolSpec(
@@ -193,6 +212,8 @@ class Tools:
             match call.name:
                 case "update_brief":
                     return _update_brief(session, args)
+                case "skip_questions":
+                    return _skip_questions(session, str(args["evidence"]))
                 case "search_collection":
                     hits = self._store.search(CollectionQuery.model_validate(args))
                     return _dump([h.model_dump(mode="json") for h in hits]) if hits else "No match."
@@ -257,7 +278,9 @@ class Tools:
             release_id=release.id, title=release.title, artists=release.artists, reason=reason
         )
         minutes = session.brief.listening_minutes()
-        return f"Picked. {FIT_NOTES[fit(release.duration_seconds, minutes)]}"
+        if runs_past(release.duration_seconds, minutes, MUCH_LONGER_FACTOR):
+            return f"Picked. {MUCH_LONGER_NOTE}"
+        return "Picked."
 
 
 def _reject(session: Session) -> str:
@@ -265,9 +288,21 @@ def _reject(session: Session) -> str:
     if session.pick is None:
         return "Nothing is picked yet."
     said = next(m.content for m in reversed(session.messages) if m.role == "user" and m.content)
-    session.rejections.append(Rejection(release_id=session.pick.release_id, reason=said))
+    pick = session.pick
+    session.rejections.append(
+        Rejection(release_id=pick.release_id, reason=said, title=pick.title, artists=pick.artists)
+    )
     session.pick = None
     return "Rejected. The candidates in the interview state are updated."
+
+
+def _skip_questions(session: Session, evidence: str) -> str:
+    """Save every unanswered slot as UNKNOWN and mark the listener as in a hurry."""
+    skipped = [slot for slot in SLOT_ORDER if getattr(session.brief, slot) is None]
+    for slot in skipped:
+        setattr(session.brief, slot, Answer(value="UNKNOWN", evidence=evidence))
+    session.hurried = True
+    return _dump({"skipped": skipped, "next_slot": None})
 
 
 def _update_brief(session: Session, args: dict[str, Any]) -> str:
@@ -276,7 +311,7 @@ def _update_brief(session: Session, args: dict[str, Any]) -> str:
         session.language = args["language"]
     before = session.brief.values()
     saved, rejected = [], {}
-    for slot in SLOT_ORDER:
+    for slot in (*SLOT_ORDER, *OPTIONAL_SLOTS):
         if args.get(slot) is None:
             continue
         try:

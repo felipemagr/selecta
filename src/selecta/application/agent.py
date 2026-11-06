@@ -8,6 +8,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 
 from selecta.application.conversation import Message, Session, Summary, ToolRun, Turn
+from selecta.application.memory import last_session, recall
 from selecta.application.picking import describe
 from selecta.application.ports import AgentModel, ModelError, SessionStore
 from selecta.application.prompts import FALLBACK_REPLIES, PERSONA, SUMMARY, WAIT_LINES
@@ -39,7 +40,8 @@ class Agent:
 
     def start(self) -> Session:
         """Open a new session."""
-        session = Session(id=uuid.uuid4().hex, started_at=self._now())
+        now = self._now()
+        session = Session(id=uuid.uuid4().hex, started_at=now, memory=recall(self._store, now))
         self._store.save_session(session)
         return session
 
@@ -152,23 +154,33 @@ class Agent:
     def _state(self, session: Session) -> str:
         """Return the interview state for the system prompt."""
         brief = session.brief
-        lines = ["Interview state (authoritative):"]
+        lines = [line] if (line := last_session(session)) else []
+        lines.append("Interview state (authoritative):")
         for slot in SLOT_ORDER:
             answer = getattr(brief, slot)
             value = "not asked yet" if answer is None else f'{answer.value} ("{answer.evidence}")'
             lines.append(f"- {slot}: {value}")
+        if whole := brief.whole_album:
+            lines.append(f'- whole album, not one side: {whole.value} ("{whole.evidence}")')
         if session.pick:
             pick = session.pick
             lines.append(
                 f"Current pick: {', '.join(pick.artists)} - {pick.title}. "
                 "If they turn it down, call reject_pick and pick another."
             )
+        if session.hurried:
+            lines.append("The listener is in a hurry: no more questions, one-sentence replies.")
         if slot := brief.next_slot():
             lines.append(f"Next to ask: {slot}.")
         elif not session.pick:
             lines.append("The interview is complete.")
+            if _just_rejected_again(session):
+                lines.append(
+                    f"They turned down {len(session.rejections)} records: before offering "
+                    "another, ask what isn't working."
+                )
             try:
-                candidates = describe(self._tools.candidates(session), brief.listening_minutes())
+                candidates = describe(self._tools.candidates(session), session)
             except Exception:
                 logger.exception("candidate lookup failed")
                 candidates = "The collection can't be reached right now: tell the listener."
@@ -177,7 +189,8 @@ class Agent:
 
 
 def _state_key(session: Session) -> str:
-    return f"{session.brief.model_dump_json()}|{session.pick}|{session.rejected_ids()}"
+    brief = session.brief.model_dump_json()
+    return f"{brief}|{session.pick}|{session.rejected_ids()}|{session.hurried}"
 
 
 def _wait_line(session: Session) -> str:
@@ -185,3 +198,10 @@ def _wait_line(session: Session) -> str:
     lines = WAIT_LINES[session.language]
     said = sum(1 for t in session.turns if t.said_while_waiting)
     return lines[said % len(lines)]
+
+
+def _just_rejected_again(session: Session) -> bool:
+    """Return whether the listener just turned down a second record, and isn't in a hurry."""
+    said = next((m.content for m in reversed(session.messages) if m.role == "user"), None)
+    rejections = session.rejections
+    return len(rejections) >= 2 and rejections[-1].reason == said and not session.hurried

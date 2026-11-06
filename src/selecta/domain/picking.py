@@ -1,22 +1,19 @@
 """Rules for picking a record."""
 
-from typing import Literal
-
 from selecta.domain.collection import ReleaseSummary
 
-Fit = Literal["no_limit", "fits", "unknown", "too_long"]
-_FIT_ORDER: dict[Fit, int] = {"no_limit": 0, "fits": 0, "unknown": 1, "too_long": 2}
+# One side can usually be played, so only a record this many times longer than the listening
+# time is worth asking about.
+MUCH_LONGER_FACTOR = 1.5
 
 
-def fit(duration_seconds: int | None, minutes: int | None) -> Fit:
-    """Return how a record's length fits the listening time."""
-    if minutes is None:
-        return "no_limit"
-    if not duration_seconds:
-        return "unknown"
-    return "fits" if duration_seconds <= minutes * 60 else "too_long"
+def runs_past(duration_seconds: int | None, minutes: int | None, factor: float = 1.0) -> bool:
+    """Return whether a record of known length runs past `factor` times the listening time."""
+    if not (minutes and duration_seconds):
+        return False
+    return duration_seconds > minutes * 60 * factor
 
 
-def rank(candidates: list[ReleaseSummary], minutes: int | None) -> list[ReleaseSummary]:
-    """Return candidates with those that fit the time first. Time never excludes a record."""
-    return sorted(candidates, key=lambda c: _FIT_ORDER[fit(c.duration_seconds, minutes)])
+def rank(candidates: list[ReleaseSummary], remembered: set[int]) -> list[ReleaseSummary]:
+    """Return candidates with fresh records before remembered ones, keeping the order otherwise."""
+    return sorted(candidates, key=lambda c: c.id in remembered)

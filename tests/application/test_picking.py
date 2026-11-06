@@ -1,7 +1,11 @@
-from selecta.application.conversation import Rejection, Session
+from datetime import UTC, datetime
+
+from selecta.application.conversation import Recalled, Rejection, Session
 from selecta.application.picking import Candidates, describe, find_candidates
 from selecta.domain.brief import Answer, Brief
 from selecta.domain.collection import ReleaseSummary
+
+NOW = datetime(2026, 11, 5, 21, 0, tzinfo=UTC)
 
 
 class Shelf:
@@ -30,14 +34,24 @@ def _record(id: int, mood: str = "calm", minutes: int = 40) -> ReleaseSummary:
     )
 
 
-def _ids(*releases: ReleaseSummary, rejected: list[int] = []) -> list[int]:  # noqa: B006
+def _ids(
+    *releases: ReleaseSummary,
+    rejected: list[int] = [],  # noqa: B006
+    remembered: list[int] = [],  # noqa: B006
+    whole_album: bool = False,
+) -> list[int]:
     session = Session(
         id="s",
-        started_at="2026-11-05T21:00:00Z",
+        started_at=NOW,
+        memory=[
+            Recalled(release_id=i, title="x", artists=[], outcome="picked", on=NOW)
+            for i in remembered
+        ],
         brief=Brief(
             mood=Answer(value="calm", evidence="calm"),
             energy=Answer(value="low", evidence="chill"),
             minutes=Answer(value=45, evidence="45 minutes"),
+            whole_album=Answer(value=True, evidence="the whole thing") if whole_album else None,
         ),
         rejections=[Rejection(release_id=i, reason="no") for i in rejected],
     )
@@ -56,13 +70,27 @@ def test_too_few_matches_relax_the_filters_keeping_strict_matches_first() -> Non
     assert _ids(_record(1), _record(2, mood="dark"), _record(3, mood="dark"))[0] == 1
 
 
-def test_fitting_record_is_kept_among_many_that_dont() -> None:
-    records = [_record(i, minutes=90) for i in range(1, 30)]
+def test_remembered_match_beats_a_relaxed_one() -> None:
+    ids = _ids(_record(1), _record(2, mood="dark"), _record(3, mood="dark"), remembered=[1])
 
-    assert _ids(*records, _record(99, minutes=30))[0] == 99
+    assert ids[0] == 1
+
+
+def test_fresh_records_come_before_remembered_ones() -> None:
+    records = [_record(i) for i in range(1, 30)]
+
+    assert set(_ids(*records, remembered=list(range(1, 29)))[:1]) == {29}
 
 
 def test_describe_says_when_nothing_is_left() -> None:
     empty = Candidates(releases=[], filters={}, relaxed=[])
 
-    assert describe(empty, minutes=45).startswith("No record is left to offer")
+    assert describe(empty, Session(id="s", started_at=NOW)).startswith("No record is left")
+
+
+def test_whole_album_leaves_out_records_known_to_run_past_the_time() -> None:
+    unknown = _record(3).model_copy(update={"duration_seconds": None})
+    records = [_record(1, minutes=40), _record(2, minutes=50), unknown]
+
+    assert sorted(_ids(*records, whole_album=True)) == [1, 3]
+    assert sorted(_ids(*records)) == [1, 2, 3]
