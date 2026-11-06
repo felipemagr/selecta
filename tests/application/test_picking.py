@@ -13,12 +13,18 @@ class Shelf:
         self.releases = releases
 
     def owned_summaries(
-        self, mood: str | None = None, energy: str | None = None
+        self, mood: str | None = None, energy: str | None = None, playable: bool = False
     ) -> list[ReleaseSummary]:
-        return [r for r in self.releases if mood in (None, r.mood) and energy in (None, r.energy)]
+        return [
+            r
+            for r in self.releases
+            if mood in (None, r.mood)
+            and energy in (None, r.energy)
+            and (r.playable_count or not playable)
+        ]
 
 
-def _record(id: int, mood: str = "calm", minutes: int = 40) -> ReleaseSummary:
+def _record(id: int, mood: str = "calm", minutes: int = 40, playable: int = 2) -> ReleaseSummary:
     return ReleaseSummary(
         id=id,
         title=f"Album {id}",
@@ -31,6 +37,8 @@ def _record(id: int, mood: str = "calm", minutes: int = 40) -> ReleaseSummary:
         mood=mood,
         energy="low",
         duration_seconds=minutes * 60,
+        track_count=2,
+        playable_count=playable,
     )
 
 
@@ -94,3 +102,14 @@ def test_whole_album_leaves_out_records_known_to_run_past_the_time() -> None:
 
     assert sorted(_ids(*records, whole_album=True)) == [1, 3]
     assert sorted(_ids(*records)) == [1, 2, 3]
+
+
+def test_only_records_on_the_music_server_are_candidates() -> None:
+    assert sorted(_ids(_record(1), _record(2, playable=0), _record(3, playable=1))) == [1, 3]
+
+
+def test_partly_downloaded_record_says_how_much_can_play() -> None:
+    session = Session(id="s", started_at=NOW)
+    candidates = Candidates(releases=[_record(1, playable=1)], filters={}, relaxed=[])
+
+    assert "Only 1 of its 2 tracks can be played." in describe(candidates, session)

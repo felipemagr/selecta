@@ -5,6 +5,7 @@ from selecta.application.ports import Chunk, CollectionQuery, WebPassage
 from selecta.domain.brief import Answer, Brief
 from selecta.domain.collection import Artist, Collection, CollectionItem, Credit, Release, Track
 from selecta.domain.enrichment import Enrichment
+from selecta.domain.library import PlayableTrack
 from selecta.infrastructure.integrations.postgres import PostgresStore
 
 
@@ -31,10 +32,10 @@ def _collection(*releases: Release, wanted: Release | None = None) -> Collection
 
 
 def test_text_search_tolerates_misspelled_names(store: PostgresStore) -> None:
-    releases = _release(1, "Kraftwerk", 1978), _release(2, "Dire Straits", 1979)
+    releases = _release(1, "Moonrakers", 1978), _release(2, "Night Shift", 1979)
     store.replace(_collection(*releases))
 
-    hits = store.search(CollectionQuery(text="craftwerk"))
+    hits = store.search(CollectionQuery(text="monrakers"))
 
     assert [r.id for r in hits] == [1]
 
@@ -180,3 +181,15 @@ def test_sessions_since_returns_recent_sessions_oldest_first(store: PostgresStor
     found = store.sessions_since(datetime(2026, 10, 5, tzinfo=UTC))
 
     assert [s.id for s in found] == ["s10", "s20"]
+
+
+def test_playable_tracks_set_what_can_be_picked_and_its_length(store: PostgresStore) -> None:
+    store.replace(_collection(_release(1, "A", 1970), _release(2, "B", 1970)))
+    track = PlayableTrack(position="A1", title="Intro", song_id="s1", duration_seconds=240)
+
+    store.save_playable(1, [track])
+
+    [playable] = store.owned_summaries(playable=True)
+    assert (playable.id, playable.playable_count, playable.track_count) == (1, 1, 1)
+    assert playable.duration_seconds == 240
+    assert store.playable(1) == [track]

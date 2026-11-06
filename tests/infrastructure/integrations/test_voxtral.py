@@ -63,16 +63,16 @@ def _transcribe(response: httpx.Response) -> tuple[str, list[bytes]]:
         sent.append(request.content)
         return response
 
-    transcriber = VoxtralTranscriber(_http(httpx.MockTransport(handler)), ["Kraftwerk"])
+    transcriber = VoxtralTranscriber(_http(httpx.MockTransport(handler)), ["Robotsband"])
 
     return asyncio.run(transcriber.transcribe(b"\x01\x00\x02\x00", "en")), sent
 
 
 def test_whole_utterance_is_sent_with_the_vocabulary() -> None:
-    text, sent = _transcribe(httpx.Response(200, json={"text": " Kraftwerk, please. "}))
+    text, sent = _transcribe(httpx.Response(200, json={"text": " Robotsband, please. "}))
 
-    assert text == "Kraftwerk, please."
-    assert b"\x01\x00\x02\x00" in sent[0] and b"Kraftwerk" in sent[0]
+    assert text == "Robotsband, please."
+    assert b"\x01\x00\x02\x00" in sent[0] and b"Robotsband" in sent[0]
 
 
 def test_failed_transcription_raises_speech_error() -> None:

@@ -20,6 +20,7 @@ from selecta.application.prompts import FALLBACK_REPLIES, WAIT_LINES
 from selecta.application.tools import Tools
 from selecta.domain.brief import Answer, Brief
 from selecta.domain.collection import ReleaseSummary
+from selecta.domain.library import PlayableTrack
 
 NOW = datetime(2026, 11, 5, 21, 0, tzinfo=UTC)
 
@@ -54,9 +55,15 @@ class MemoryStore:
         self.web: list[WebPassage] = []
 
     def owned_summaries(
-        self, mood: str | None = None, energy: str | None = None
+        self, mood: str | None = None, energy: str | None = None, playable: bool = False
     ) -> list[ReleaseSummary]:
-        return [r for r in self.releases if mood in (None, r.mood) and energy in (None, r.energy)]
+        return [
+            r
+            for r in self.releases
+            if mood in (None, r.mood)
+            and energy in (None, r.energy)
+            and (r.playable_count or not playable)
+        ]
 
     def owned_summary(self, release_id: int) -> ReleaseSummary | None:
         return next((r for r in self.releases if r.id == release_id), None)
@@ -70,6 +77,12 @@ class MemoryStore:
     def sessions_since(self, since: datetime) -> list[Session]:
         found = [s for s in self.sessions.values() if s.started_at >= since]
         return sorted(found, key=lambda s: s.started_at)
+
+    def playable(self, release_id: int) -> list[PlayableTrack]:
+        playable = next(r.playable_count for r in self.releases if r.id == release_id)
+        return [
+            PlayableTrack(position=f"A{i}", title=f"T{i}", song_id=f"s{i}") for i in range(playable)
+        ]
 
     def artist_urls(self, release_id: int) -> list[str]:
         return []
@@ -173,13 +186,13 @@ class BrokenStore(MemoryStore):
 
 
 def test_failing_tool_is_reported_to_the_model_not_raised() -> None:
-    call = ToolCall(id="c1", name="search_collection", arguments={"text": "kraftwerk"})
+    call = ToolCall(id="c1", name="search_collection", arguments={"text": "robotsband"})
     model = ScriptedModel(Reply(tool_calls=[call]), Reply(text="I can't check right now."))
     store = BrokenStore()
     agent = Agent(model, Tools(store, embedder=None), store, now=lambda: NOW)  # type: ignore[arg-type]
     session = agent.start()
 
-    reply = agent.reply(session, "do I have kraftwerk?")
+    reply = agent.reply(session, "do I have robotsband?")
 
     assert reply == "I can't check right now."
     assert [m.role for m in session.messages] == ["user", "assistant", "tool", "assistant"]
@@ -229,6 +242,8 @@ def _record(id: int, mood: str = "calm", minutes: int | None = 40) -> ReleaseSum
         mood=mood,
         energy="low",
         duration_seconds=minutes * 60 if minutes else None,
+        track_count=1,
+        playable_count=1,
     )
 
 
@@ -290,16 +305,16 @@ def test_rejected_record_can_be_picked_when_asked_by_name() -> None:
 
 
 @pytest.mark.parametrize(
-    ("release_id", "asked_by_name", "complete", "refusal"),
+    ("release_id", "complete", "refusal"),
     [
-        (3, False, True, "Pick from the candidates"),
-        (1, False, True, "The listener already rejected that record"),
-        (2, False, False, "Finish the interview first"),
-        (99, True, True, "That record isn't in the listener's collection"),
+        (3, True, "Pick from the candidates"),
+        (1, True, "The listener already rejected that record"),
+        (2, False, "Finish the interview first"),
+        (99, True, "That record isn't in the listener's collection"),
     ],
 )
-def test_pick_is_refused(release_id: int, asked_by_name: bool, complete: bool, refusal: str):
-    args = {"release_id": release_id, "reason": "x", "asked_by_name": asked_by_name}
+def test_pick_is_refused(release_id: int, complete: bool, refusal: str):
+    args = {"release_id": release_id, "reason": "x"}
     pick = Reply(tool_calls=[ToolCall(id="p", name="pick_record", arguments=args)])
     records = _record(1), _record(2), _record(4), _record(5), _record(3, mood="dark")
     agent, _ = _agent(ScriptedModel(pick, Reply(text="Hmm.")), *records)
@@ -537,3 +552,103 @@ def test_empty_last_reply_after_speaking_ends_the_turn_without_the_fallback() ->
     assert reply == "Here's Album 1! It's short."
     assert [m.role for m in session.messages][-2:] == ["tool", "assistant"]
     assert session.messages[-1].content == reply
+
+
+def _play_turn(
+    playable: int, result: str = "playing"
+) -> tuple[Session, list[list[PlayableTrack]], ScriptedModel]:
+    played: list[list[PlayableTrack]] = []
+
+    def play(tracks: list[PlayableTrack]) -> str:
+        played.append(tracks)
+        return result
+
+    call = Reply(tool_calls=[ToolCall(id="pl", name="play_record", arguments={"release_id": 1})])
+    model = ScriptedModel(call, Reply(text="Enjoy."))
+    record = _record(1).model_copy(update={"playable_count": playable, "track_count": 2})
+    agent, _ = _agent(model, record)
+    session = agent.start()
+    session.pick = Pick(release_id=1, title="Album 1", artists=["Someone"], reason="x")
+    agent.reply(session, "play it", play=play)  # type: ignore[arg-type]
+    return session, played, model
+
+
+@pytest.mark.parametrize(
+    ("playable", "result", "told"),
+    [
+        (2, "playing", "Playing: 2 tracks"),
+        (2, "failed", "didn't start"),
+        (0, "playing", "only on vinyl"),
+    ],
+)
+def test_play_record_reports_what_the_player_did(playable: int, result: str, told: str) -> None:
+    session, played, _ = _play_turn(playable, result)
+
+    assert told in session.turns[0].tool_runs[0].result
+    assert len(played) == (1 if playable else 0)
+
+
+def test_play_record_is_only_offered_with_a_player() -> None:
+    model = ScriptedModel(Reply(text="Hi."))
+    agent, _ = _agent(model)
+    tools = agent._tools
+
+    assert "play_record" not in [s.name for s in tools.specs(can_play=False)]
+    assert "play_record" in [s.name for s in tools.specs(can_play=True)]
+
+
+def test_a_record_the_listener_names_is_picked_mid_interview_and_over_a_pick() -> None:
+    args = {"release_id": 3, "reason": "they named it", "asked_by_name": True}
+    pick = Reply(tool_calls=[ToolCall(id="p", name="pick_record", arguments=args)])
+    agent, _ = _agent(ScriptedModel(pick, Reply(text="Album 3, then.")), _record(1), _record(3))
+    session = agent.start()
+    session.pick = Pick(release_id=1, title="Album 1", artists=["Someone"], reason="x")
+
+    agent.reply(session, "let's just put Album 3")
+
+    assert session.pick is not None and session.pick.release_id == 3
+
+
+def test_playing_a_named_record_picks_it_in_the_same_call() -> None:
+    played: list[list[PlayableTrack]] = []
+    call = ToolCall(id="pl", name="play_record", arguments={"release_id": 1})
+    agent, _ = _agent(ScriptedModel(Reply(tool_calls=[call]), Reply(text="Enjoy.")), _record(1))
+    session = agent.start()
+
+    agent.reply(session, "play Album 1", play=lambda t: played.append(t) or "playing")  # type: ignore[arg-type,func-returns-value]
+
+    assert session.pick is not None and len(played) == 1
+
+
+def test_playing_an_unknown_record_asks_to_search_first() -> None:
+    call = ToolCall(id="pl", name="play_record", arguments={"release_id": 999})
+    agent, _ = _agent(ScriptedModel(Reply(tool_calls=[call]), Reply(text="Hm.")), _record(1))
+    session = agent.start()
+
+    agent.reply(session, "play Album 1", play=lambda t: "playing")  # type: ignore[arg-type]
+
+    assert session.pick is None
+    assert "search_collection" in session.turns[0].tool_runs[0].result
+
+
+@pytest.mark.parametrize(
+    ("track", "first", "told"),
+    [
+        ("2", "s1", "Playing: 2 tracks"),
+        ("A2", "s2", "Playing: 1 tracks"),
+        ("9", None, "no track 9"),
+    ],
+)
+def test_play_can_start_at_a_given_track(track: str, first: str | None, told: str) -> None:
+    played: list[list[PlayableTrack]] = []
+    args = {"release_id": 1, "track": track}
+    call = Reply(tool_calls=[ToolCall(id="pl", name="play_record", arguments=args)])
+    record = _record(1).model_copy(update={"playable_count": 3, "track_count": 3})
+    agent, _ = _agent(ScriptedModel(call, Reply(text="Enjoy.")), record)
+    session = agent.start()
+    session.pick = Pick(release_id=1, title="Album 1", artists=["Someone"], reason="x")
+
+    agent.reply(session, "the next one", play=lambda t: played.append(t) or "playing")  # type: ignore[arg-type,func-returns-value]
+
+    assert told in session.turns[0].tool_runs[0].result
+    assert (played[0][0].song_id if played else None) == first

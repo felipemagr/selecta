@@ -13,6 +13,7 @@ class Track(BaseModel):
     position: str
     title: str
     duration_seconds: int | None = None
+    artists: list[str] = []
 
 
 class Credit(BaseModel):
@@ -64,6 +65,8 @@ class ReleaseSummary(BaseModel):
     mood: Mood | None = None
     energy: Energy | None = None
     duration_seconds: int | None = None
+    track_count: int = 0
+    playable_count: int = 0
 
 
 class Artist(BaseModel):

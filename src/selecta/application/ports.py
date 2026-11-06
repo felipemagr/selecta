@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from selecta.application.conversation import Message, Reply, Session, ToolSpec
 from selecta.domain.collection import Collection, Release, ReleaseSummary
 from selecta.domain.enrichment import Energy, Enrichment, Mood
+from selecta.domain.library import PlayableTrack, Song
 
 
 class CollectionQuery(BaseModel):
@@ -108,9 +109,12 @@ class CollectionStore(Protocol):
         ...
 
     def owned_summaries(
-        self, mood: Mood | None = None, energy: Energy | None = None
+        self, mood: Mood | None = None, energy: Energy | None = None, playable: bool = False
     ) -> list[ReleaseSummary]:
-        """Return every owned release with the given mood and energy, unset meaning any."""
+        """Return every owned release with the given mood and energy, unset meaning any.
+
+        With `playable`, only those with at least one track on the music server.
+        """
         ...
 
     def owned_summary(self, release_id: int) -> ReleaseSummary | None:
@@ -143,6 +147,14 @@ class CollectionStore(Protocol):
 
     def semantic_search(self, text: str, embedding: list[float], limit: int) -> list[Passage]:
         """Return the chunks closest to the query, by meaning and by keywords."""
+        ...
+
+    def save_playable(self, release_id: int, tracks: list[PlayableTrack]) -> None:
+        """Replace the release's tracks that are on the music server."""
+        ...
+
+    def playable(self, release_id: int) -> list[PlayableTrack]:
+        """Return the release's tracks on the music server, in the record's order."""
         ...
 
     def artist_urls(self, release_id: int) -> list[str]:
@@ -217,6 +229,21 @@ class Reranker(Protocol):
     def rerank(self, query: str, documents: list[str], top_n: int) -> list[Ranked]:
         """Return the best `top_n` documents, best first. Raises RerankError."""
         ...
+
+
+class MusicLibraryError(Exception):
+    """The music server could not be read."""
+
+
+class MusicLibrary(Protocol):
+    """The listener's music server: what can actually be played."""
+
+    def songs(self) -> list[Song]:
+        """Return every song on the server. Raises MusicLibraryError."""
+        ...
+
+
+PlaybackResult = Literal["playing", "failed", "cancelled"]
 
 
 class SpeechError(Exception):

@@ -12,10 +12,15 @@ from selecta.application.conversation import Session
 from selecta.application.ports import Chunk, ChunkKind, CollectionQuery, Passage, WebPassage
 from selecta.domain.collection import Collection, CollectionItem, Release, ReleaseSummary
 from selecta.domain.enrichment import Energy, Enrichment, Mood
+from selecta.domain.library import PlayableTrack
 
+# The length is what can be played when every playable track's length is known, else Discogs'.
 _SUMMARY_COLUMNS = (
     "id, title, artists, original_year, label, format, genres, styles, mood, energy, "
-    "duration_seconds"
+    "coalesce((SELECT sum(p.duration_seconds) FROM downloaded_tracks p WHERE p.release_id = id "
+    "HAVING count(p.duration_seconds) = count(*)), duration_seconds) AS duration_seconds, "
+    "jsonb_array_length(tracks) AS track_count, "
+    "(SELECT count(*) FROM downloaded_tracks p WHERE p.release_id = id) AS playable_count"
 )
 _COLUMNS = [
     "id",
@@ -133,14 +138,19 @@ class PostgresStore:
         return [ReleaseSummary.model_validate(row) for row in rows]
 
     def owned_summaries(
-        self, mood: Mood | None = None, energy: Energy | None = None
+        self, mood: Mood | None = None, energy: Energy | None = None, playable: bool = False
     ) -> list[ReleaseSummary]:
-        """Return every owned release with the given mood and energy, unset meaning any."""
+        """Return every owned release with the given mood and energy, unset meaning any.
+
+        With `playable`, only those with at least one track on the music server.
+        """
         rows = self._conn.execute(
             f"SELECT {_SUMMARY_COLUMNS} FROM releases WHERE owned "
             "AND (%(mood)s::text IS NULL OR mood = %(mood)s) "
-            "AND (%(energy)s::text IS NULL OR energy = %(energy)s) ORDER BY id",
-            {"mood": mood, "energy": energy},
+            "AND (%(energy)s::text IS NULL OR energy = %(energy)s) "
+            "AND (NOT %(playable)s OR EXISTS "
+            "(SELECT 1 FROM downloaded_tracks p WHERE p.release_id = id)) ORDER BY id",
+            {"mood": mood, "energy": energy, "playable": playable},
         ).fetchall()
         return [ReleaseSummary.model_validate(row) for row in rows]
 
@@ -301,6 +311,35 @@ class PostgresStore:
             "WHERE kind = 'web' AND ref_id = %s AND position = ANY (%s)",
             [release_id, positions],
         )
+
+    def save_playable(self, release_id: int, tracks: list[PlayableTrack]) -> None:
+        """Replace the release's playable tracks."""
+        with self._conn.transaction():
+            self._conn.execute("DELETE FROM downloaded_tracks WHERE release_id = %s", [release_id])
+            self._conn.cursor().executemany(
+                "INSERT INTO downloaded_tracks VALUES (%(release_id)s, %(ord)s, %(position)s, "
+                "%(title)s, %(song_id)s, %(duration_seconds)s)",
+                [
+                    {**t.model_dump(), "release_id": release_id, "ord": i}
+                    for i, t in enumerate(tracks)
+                ],
+            )
+
+    def has_song(self, song_id: str) -> bool:
+        """Return whether the song plays a track of one of the listener's records."""
+        row = self._conn.execute(
+            "SELECT EXISTS (SELECT 1 FROM downloaded_tracks WHERE song_id = %s) AS found", [song_id]
+        ).fetchone()
+        return bool(row and row["found"])
+
+    def playable(self, release_id: int) -> list[PlayableTrack]:
+        """Return the release's playable tracks, in the record's order."""
+        rows = self._conn.execute(
+            "SELECT position, title, song_id, duration_seconds FROM downloaded_tracks "
+            "WHERE release_id = %s ORDER BY ord",
+            [release_id],
+        ).fetchall()
+        return [PlayableTrack.model_validate(row) for row in rows]
 
     def save_session(self, session: Session) -> None:
         """Insert or replace a session."""

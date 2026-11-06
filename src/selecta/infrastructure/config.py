@@ -30,6 +30,14 @@ class TAVILY:
     MAX_CONTENT_CHARS = 600
 
 
+class NAVIDROME:
+    URL = os.environ.get("NAVIDROME_URL")
+    USER = os.environ.get("NAVIDROME_USER")
+    PASSWORD = os.environ.get("NAVIDROME_PASSWORD")
+    TIMEOUT_SECONDS = 30
+    PAGE_SIZE = 500
+
+
 class COHERE:
     API_KEY = os.environ.get("COHERE_API_KEY")
     API_URL = "https://api.cohere.com"
