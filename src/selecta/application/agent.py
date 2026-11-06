@@ -12,6 +12,7 @@ from selecta.application.memory import last_session, recall
 from selecta.application.picking import describe
 from selecta.application.ports import AgentModel, ModelError, SessionStore
 from selecta.application.prompts import FALLBACK_REPLIES, PERSONA, SUMMARY, WAIT_LINES
+from selecta.application.speech import SentenceStream
 from selecta.application.tools import Tools
 from selecta.domain.brief import SLOT_ORDER
 
@@ -29,14 +30,11 @@ class Agent:
         tools: Tools,
         store: SessionStore,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
-        say: Callable[[str], None] = lambda _: None,
     ) -> None:
-        """Wire the agent. `say` speaks a line right away, before the turn's reply is ready."""
         self._model = model
         self._tools = tools
         self._store = store
         self._now = now
-        self._say = say
 
     def start(self) -> Session:
         """Open a new session."""
@@ -45,7 +43,9 @@ class Agent:
         self._store.save_session(session)
         return session
 
-    def reply(self, session: Session, text: str) -> str:
+    def reply(
+        self, session: Session, text: str, say: Callable[[str], None] = lambda _: None
+    ) -> str:
         """Return the reply to one listener turn, and save the session."""
         started = time.monotonic()
         turn = Turn(
@@ -57,13 +57,7 @@ class Agent:
             pick_before=session.pick,
         )
         session.messages.append(Message(role="user", content=text))
-        try:
-            turn.reply = self._run_rounds(session, turn)
-        except ModelError as e:
-            logger.warning("model failed, answering with the fallback: %s", e)
-            turn.error = str(e)
-            turn.reply = FALLBACK_REPLIES[session.language]
-            session.messages.append(Message(role="assistant", content=turn.reply))
+        turn.reply = self._run_rounds(session, turn, say)
         turn.brief_after = session.brief.model_copy(deep=True)
         turn.pick_after = session.pick
         turn.latency_ms = round((time.monotonic() - started) * 1000)
@@ -71,34 +65,52 @@ class Agent:
         self._store.save_session(session)
         return turn.reply
 
-    def _run_rounds(self, session: Session, turn: Turn) -> str:
+    def _run_rounds(self, session: Session, turn: Turn, say: Callable[[str], None]) -> str:
         spoken: list[str] = []
+
+        def speak(line: str) -> None:
+            spoken.append(line)
+            say(line)
+
         # The state only changes when a tool changes the session, so it's rebuilt only then.
         state, key = "", None
         for _ in range(MAX_MODEL_ROUNDS):
             if key != (new_key := _state_key(session)):
                 state, key = self._state(session), new_key
             turn.contexts.append(state)
-            reply = self._model.chat(f"{PERSONA}\n\n{state}", session.messages, self._tools.specs)
+            stream = SentenceStream(speak)
+            system, specs = f"{PERSONA}\n\n{state}", self._tools.specs
+            try:
+                reply = self._model.chat(system, session.messages, specs, stream.feed)
+            except ModelError as e:
+                logger.warning("model failed, answering with the fallback: %s", e)
+                turn.error = str(e)
+                # Sentences streamed before the failure were heard, so they stay in the history.
+                return self._fall_back(session, speak, spoken, heard=tuple(stream.spoken))
+            stream.close()
             turn.model_rounds += 1
             turn.input_tokens += reply.input_tokens
             turn.output_tokens += reply.output_tokens
-            message = Message(role="assistant", content=reply.text, tool_calls=reply.tool_calls)
+            message = Message(role="assistant", tool_calls=reply.tool_calls)
             session.messages.append(message)
             if not reply.tool_calls:
-                spoken += [reply.text] if reply.text else []
-                return " ".join(spoken) or FALLBACK_REPLIES[session.language]
-            pick_before = session.pick
-            said_before = turn.said_while_waiting
+                if stream.spoken:
+                    message.content = " ".join(stream.spoken)
+                    return " ".join(spoken)
+                session.messages.pop()
+                if not spoken:
+                    return self._fall_back(session, speak, spoken)
+                # Nothing more to say: what this turn already said becomes its closing message.
+                _close_turn(session, spoken)
+                return " ".join(spoken)
 
-            def before_search(message: Message = message) -> None:
-                if turn.said_while_waiting:
+            def before_search(stream: SentenceStream = stream) -> None:
+                # What the model said with the call already covers the wait.
+                if turn.said_while_waiting or stream.spoken:
                     return
-                # The model's own text, if any, is the wait line, so the listener hears it once.
-                line = message.content or _wait_line(session)
-                message.content = line
-                turn.said_while_waiting = line
-                self._say(line)
+                turn.said_while_waiting = _wait_line(session)
+                stream.spoken.append(turn.said_while_waiting)
+                speak(turn.said_while_waiting)
 
             runs = [
                 ToolRun(call=call, result=self._tools.run(call, session, before_search))
@@ -109,17 +121,27 @@ class Agent:
                 Message(role="tool", content=r.result, tool_call_id=r.call.id, name=r.call.name)
                 for r in runs
             ]
-            # Text sent with a pick is spoken only if this round's pick was accepted.
-            tried = any(r.call.name == "pick_record" for r in runs)
-            if tried and (session.pick is None or session.pick == pick_before):
-                said_now = turn.said_while_waiting != said_before
-                message.content = turn.said_while_waiting if said_now else None
-            elif reply.text and turn.said_while_waiting == said_before:
-                spoken.append(reply.text)
+            if stream.spoken and _brief_saved_and_asked(runs, stream.spoken, session):
+                # The question goes after the tool results: a turn must end on the assistant.
+                session.messages.append(Message(role="assistant", content=" ".join(stream.spoken)))
+                return " ".join(spoken)
+            # The history holds what the listener heard, not what the model planned to say.
+            message.content = " ".join(stream.spoken) or None
         logger.warning("no answer after %d model rounds", MAX_MODEL_ROUNDS)
+        return self._fall_back(session, speak, spoken)
+
+    def _fall_back(
+        self,
+        session: Session,
+        speak: Callable[[str], None],
+        spoken: list[str],
+        heard: tuple[str, ...] = (),
+    ) -> str:
+        """Speak the fallback reply and record it, after anything already heard this round."""
         fallback = FALLBACK_REPLIES[session.language]
-        session.messages.append(Message(role="assistant", content=fallback))
-        return fallback
+        session.messages.append(Message(role="assistant", content=" ".join([*heard, fallback])))
+        speak(fallback)
+        return " ".join(spoken)
 
     def finish(self, session: Session) -> Summary:
         """Write the session summary: key points from code, a short text from the model."""
@@ -205,3 +227,28 @@ def _just_rejected_again(session: Session) -> bool:
     said = next((m.content for m in reversed(session.messages) if m.role == "user"), None)
     rejections = session.rejections
     return len(rejections) >= 2 and rejections[-1].reason == said and not session.hurried
+
+
+def _brief_saved_and_asked(runs: list[ToolRun], spoken: list[str], session: Session) -> bool:
+    """Return whether the round only saved valid answers and already asked the next question.
+
+    Then the interview goes on without another model call.
+    """
+    asked = any(s.rstrip("\"”’)' ").endswith("?") for s in spoken)
+    if not asked or not all(r.call.name == "update_brief" for r in runs):
+        return False
+    if session.brief.next_slot() is None:
+        return False
+    try:
+        return not any(json.loads(r.result).get("rejected") for r in runs)
+    except (json.JSONDecodeError, AttributeError):
+        return False
+
+
+def _close_turn(session: Session, spoken: list[str]) -> None:
+    """End the turn on one assistant message holding everything it said, as the API requires."""
+    start = max(i for i, m in enumerate(session.messages) if m.role == "user")
+    for message in session.messages[start:]:
+        if message.role == "assistant":
+            message.content = None
+    session.messages.append(Message(role="assistant", content=" ".join(spoken)))

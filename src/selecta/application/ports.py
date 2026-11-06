@@ -1,5 +1,6 @@
 """Interfaces the application needs from the outside world."""
 
+from collections.abc import AsyncIterator, Callable
 from datetime import datetime
 from typing import Literal, Protocol
 
@@ -186,8 +187,14 @@ class AgentModel(Protocol):
 
     model: str
 
-    def chat(self, system: str, messages: list[Message], tools: list[ToolSpec]) -> Reply:
-        """Return the next reply."""
+    def chat(
+        self,
+        system: str,
+        messages: list[Message],
+        tools: list[ToolSpec],
+        on_text: Callable[[str], None] | None = None,
+    ) -> Reply:
+        """Return the next reply. With `on_text`, it streams: each piece of text as it comes."""
         ...
 
 
@@ -209,6 +216,26 @@ class Reranker(Protocol):
 
     def rerank(self, query: str, documents: list[str], top_n: int) -> list[Ranked]:
         """Return the best `top_n` documents, best first. Raises RerankError."""
+        ...
+
+
+class SpeechError(Exception):
+    """A speech-to-text or text-to-speech call failed."""
+
+
+class SpeechToText(Protocol):
+    """Transcription of one utterance."""
+
+    async def transcribe(self, pcm: bytes, language: str | None) -> str:
+        """Return the transcript of an utterance in 16 kHz 16-bit mono PCM. Raises SpeechError."""
+        ...
+
+
+class TextToSpeech(Protocol):
+    """Speech synthesis, streamed."""
+
+    def speak(self, text: str, language: str) -> AsyncIterator[bytes]:
+        """Yield the spoken text as raw audio chunks as they are generated. Raises SpeechError."""
         ...
 
 

@@ -41,7 +41,7 @@ class MISTRAL:
     API_KEY = os.environ.get("MISTRAL_API_KEY")
     API_URL = "https://api.mistral.ai/v1"
     CHAT_MODEL = "ministral-8b-2512"
-    AGENT_MODEL = "mistral-small-2603"
+    AGENT_MODEL = os.environ.get("SELECTA_AGENT_MODEL", "mistral-small-2603")
     AGENT_TEMPERATURE = 0.3
     EMBED_MODEL = "mistral-embed-2312"
     EMBED_BATCH_SIZE = 16
@@ -49,3 +49,22 @@ class MISTRAL:
     TIMEOUT_SECONDS = 60
     RETRY_WAIT_SECONDS = 2
     MAX_RETRIES = 5
+
+
+class VOICE:
+    STT_MODEL = "voxtral-mini-transcribe-3"
+    STT_SAMPLE_RATE = 16000
+    TTS_MODEL = "voxtral-mini-tts-3"
+    TIMEOUT_SECONDS = 15
+    TTS_ATTEMPTS = 2
+    MAX_SILENCE_SECONDS = 10
+    VOICES = {
+        "en": "82c99ee6-f932-423f-a4a3-d403c8914b8d",  # Jane, neutral
+        "es": "01a0f318-4afd-77a5-aa5e-f4d741c30187",  # Elena
+        "fr": "5a271406-039d-46fe-835b-fbbb00eaf08d",  # Marie, neutral
+    }
+
+
+class SERVER:
+    HOST = os.environ.get("SELECTA_HOST", "127.0.0.1")
+    PORT = int(os.environ.get("SELECTA_PORT", "8000"))
