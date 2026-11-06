@@ -86,6 +86,19 @@ class Rejection(BaseModel):
 
     release_id: int
     reason: str
+    title: str = ""
+    artists: list[str] = []
+
+
+class Recalled(BaseModel):
+    """What happened to a record in a past session."""
+
+    release_id: int
+    title: str
+    artists: list[str]
+    outcome: Literal["picked", "rejected"]
+    on: datetime
+    reason: str | None = None
 
 
 class Summary(BaseModel):
@@ -106,6 +119,8 @@ class Session(BaseModel):
     brief: Brief = Brief()
     pick: Pick | None = None
     rejections: list[Rejection] = []
+    memory: list[Recalled] = []
+    hurried: bool = False
     summary: Summary | None = None
     messages: list[Message] = []
     turns: list[Turn] = []

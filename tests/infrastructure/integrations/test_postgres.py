@@ -171,3 +171,12 @@ def test_web_passages_survive_reindex_until_the_record_leaves(store: PostgresSto
 
     assert len(kept) == 1
     assert store.web_passages(1) == []
+
+
+def test_sessions_since_returns_recent_sessions_oldest_first(store: PostgresStore) -> None:
+    for day in (1, 20, 10):
+        store.save_session(Session(id=f"s{day}", started_at=datetime(2026, 10, day, tzinfo=UTC)))
+
+    found = store.sessions_since(datetime(2026, 10, 5, tzinfo=UTC))
+
+    assert [s.id for s in found] == ["s10", "s20"]

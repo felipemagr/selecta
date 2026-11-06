@@ -58,6 +58,10 @@ class MemoryStore:
     def load_session(self, session_id: str) -> Session | None:
         return self.sessions.get(session_id)
 
+    def sessions_since(self, since: datetime) -> list[Session]:
+        found = [s for s in self.sessions.values() if s.started_at >= since]
+        return sorted(found, key=lambda s: s.started_at)
+
     def artist_urls(self, release_id: int) -> list[str]:
         return []
 
@@ -332,8 +336,10 @@ def test_pick_made_mid_interview_survives_answering_a_slot() -> None:
     assert "Current pick: Someone - Album 1" in model.systems[-1]
 
 
-@pytest.mark.parametrize(("minutes", "note"), [(40, "fits"), (None, "unknown"), (90, "longer")])
-def test_pick_result_says_how_the_length_fits(minutes: int | None, note: str) -> None:
+@pytest.mark.parametrize(
+    ("minutes", "mentioned"), [(40, False), (None, False), (60, False), (90, True)]
+)
+def test_length_is_mentioned_only_when_much_longer(minutes: int | None, mentioned: bool) -> None:
     model = ScriptedModel(_pick(1), Reply(text="Here you go."))
     agent, _ = _agent(model, _record(1, minutes=minutes))
     session = agent.start()
@@ -341,7 +347,8 @@ def test_pick_result_says_how_the_length_fits(minutes: int | None, note: str) ->
 
     agent.reply(session, "go")
 
-    assert session.pick is not None and note in session.turns[0].tool_runs[0].result
+    assert session.pick is not None
+    assert ("one side is fine" in session.turns[0].tool_runs[0].result) is mentioned
 
 
 def test_rejected_pick_leaves_the_candidates() -> None:
@@ -355,7 +362,7 @@ def test_rejected_pick_leaves_the_candidates() -> None:
     agent.reply(session, "not that one")
 
     assert session.pick is None
-    assert session.rejections == [Rejection(release_id=1, reason="not that one")]
+    assert [(r.release_id, r.reason) for r in session.rejections] == [(1, "not that one")]
     assert "- 1:" not in model.systems[-1]
 
 
@@ -416,3 +423,87 @@ def test_model_text_sent_with_a_search_is_the_wait_line_and_said_once() -> None:
 
     assert said == ["Let me check."]
     assert reply == "B produced it."
+
+
+def _past_session(started_at: datetime, picked: int | None, rejected: dict[int, str]) -> Session:
+    pick = (
+        Pick(release_id=picked, title=f"Album {picked}", artists=["Someone"], reason="x")
+        if picked
+        else None
+    )
+    return Session(
+        id=f"past-{started_at:%d}",
+        started_at=started_at,
+        pick=pick,
+        rejections=[
+            Rejection(release_id=i, reason=why, title=f"Album {i}", artists=["Someone"])
+            for i, why in rejected.items()
+        ],
+    )
+
+
+def test_past_sessions_put_remembered_records_after_fresh_ones_with_their_history() -> None:
+    model = ScriptedModel(Reply(text="Something calm, then?"))
+    agent, store = _agent(model, _record(1), _record(2), _record(3))
+    store.save_session(_past_session(datetime(2026, 11, 1, tzinfo=UTC), 1, {2: "too sad tonight"}))
+    session = agent.start()
+    session.brief = _complete_brief()
+
+    agent.reply(session, "go")
+
+    state = model.systems[0]
+    last = 'picked Someone - Album 1; they turned down Someone - Album 2 ("too sad tonight")'
+    assert f"rejection (Nov 1): {last}." in state
+    assert state.index("- 3:") < state.index("- 1:") and state.index("- 3:") < state.index("- 2:")
+    assert 'They turned it down on Nov 1 ("too sad tonight")' in state
+
+
+def test_sessions_older_than_the_memory_window_are_forgotten() -> None:
+    model = ScriptedModel(Reply(text="Hi."))
+    agent, store = _agent(model)
+    store.save_session(_past_session(datetime(2026, 9, 1, tzinfo=UTC), 1, {}))
+
+    assert agent.start().memory == []
+
+
+def test_skipping_questions_completes_the_brief_and_shortens_replies() -> None:
+    call = ToolCall(id="s1", name="skip_questions", arguments={"evidence": "just pick"})
+    skip = Reply(tool_calls=[call])
+    model = ScriptedModel(skip, Reply(text="Album 1, then."))
+    agent, _ = _agent(model, _record(1), _record(2), _record(3))
+    session = agent.start()
+    session.brief = Brief(mood=Answer(value="calm", evidence="calm"))
+
+    agent.reply(session, "ugh, just pick something")
+
+    assert session.brief.next_slot() is None
+    assert session.brief.mood is not None and session.brief.mood.value == "calm"
+    assert session.brief.minutes is not None and session.brief.minutes.evidence == "just pick"
+    assert "in a hurry" in model.systems[1] and "Pick one with pick_record" in model.systems[1]
+
+
+@pytest.mark.parametrize(
+    ("hurried", "said", "asked"),
+    [(False, "nope", True), (True, "nope", False), (False, "hm", False)],
+)
+def test_two_rejections_ask_what_is_not_working_once(hurried: bool, said: str, asked: bool) -> None:
+    model = ScriptedModel(Reply(text="What's not working?"))
+    agent, _ = _agent(model, _record(1), _record(2), _record(3))
+    session = agent.start()
+    session.brief = _complete_brief()
+    session.hurried = hurried
+    session.rejections = [Rejection(release_id=i, reason="nope") for i in (1, 2)]
+
+    agent.reply(session, said)
+
+    assert ("ask what isn't working" in model.systems[0]) is asked
+
+
+def test_the_latest_outcome_of_a_remembered_record_wins() -> None:
+    agent, store = _agent(ScriptedModel())
+    store.save_session(_past_session(datetime(2026, 11, 1, tzinfo=UTC), None, {1: "not tonight"}))
+    store.save_session(_past_session(datetime(2026, 11, 3, tzinfo=UTC), 1, {1: "no"}))
+
+    [recalled] = agent.start().memory
+
+    assert (recalled.outcome, recalled.on.day) == ("picked", 3)
