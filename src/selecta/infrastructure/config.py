@@ -22,6 +22,21 @@ class DATABASE:
     URL = os.environ.get("DATABASE_URL")
 
 
+class TAVILY:
+    API_KEY = os.environ.get("TAVILY_API_KEY")
+    API_URL = "https://api.tavily.com"
+    TIMEOUT_SECONDS = 5
+    MAX_RESULTS = 3
+    MAX_CONTENT_CHARS = 600
+
+
+class COHERE:
+    API_KEY = os.environ.get("COHERE_API_KEY")
+    API_URL = "https://api.cohere.com"
+    RERANK_MODEL = "rerank-v3.5"
+    TIMEOUT_SECONDS = 3
+
+
 class MISTRAL:
     API_KEY = os.environ.get("MISTRAL_API_KEY")
     API_URL = "https://api.mistral.ai/v1"

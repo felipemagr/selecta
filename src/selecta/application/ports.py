@@ -55,6 +55,37 @@ class Passage(BaseModel):
     score: float
 
 
+class WebPassage(BaseModel):
+    """A passage about a record found on the web, with its source. Stored ones have a position."""
+
+    url: str
+    text: str
+    position: int | None = None
+
+
+class WebPage(BaseModel):
+    """A web page found for a query, with the passage that matched it."""
+
+    url: str
+    title: str
+    content: str
+
+
+class WebSearchError(Exception):
+    """A web search failed."""
+
+
+class Ranked(BaseModel):
+    """A document's place in a reranking: its index in the input and how well it answers."""
+
+    index: int
+    score: float
+
+
+class RerankError(Exception):
+    """A reranking failed."""
+
+
 class CollectionSource(Protocol):
     """Where the listener's collection comes from."""
 
@@ -112,6 +143,22 @@ class CollectionStore(Protocol):
         """Return the chunks closest to the query, by meaning and by keywords."""
         ...
 
+    def artist_urls(self, release_id: int) -> list[str]:
+        """Return the links Discogs lists for the release's artists."""
+        ...
+
+    def web_passages(self, release_id: int) -> list[WebPassage]:
+        """Return every stored web passage about the release."""
+        ...
+
+    def add_web_passages(self, release_id: int, passages: list[WebPassage], keep: int) -> None:
+        """Store new web passages about a release, then drop the least used beyond `keep`."""
+        ...
+
+    def mark_used(self, release_id: int, positions: list[int]) -> None:
+        """Count one more use of each stored web passage."""
+        ...
+
 
 class ChatModel(Protocol):
     """An LLM that answers with JSON matching a schema."""
@@ -140,6 +187,27 @@ class AgentModel(Protocol):
 
     def chat(self, system: str, messages: list[Message], tools: list[ToolSpec]) -> Reply:
         """Return the next reply."""
+        ...
+
+
+class WebSearch(Protocol):
+    """A web search engine."""
+
+    def search(
+        self, query: str, include_domains: list[str], exclude_domains: list[str]
+    ) -> list[WebPage]:
+        """Return the passages that best match `query`. Raises WebSearchError.
+
+        With `include_domains` empty, the whole web is searched, minus `exclude_domains`.
+        """
+        ...
+
+
+class Reranker(Protocol):
+    """A model that scores how well each document answers a query."""
+
+    def rerank(self, query: str, documents: list[str], top_n: int) -> list[Ranked]:
+        """Return the best `top_n` documents, best first. Raises RerankError."""
         ...
 
 

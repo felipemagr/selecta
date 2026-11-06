@@ -10,8 +10,8 @@ from datetime import UTC, datetime
 from selecta.application.conversation import Message, Session, Summary, ToolRun, Turn
 from selecta.application.picking import describe
 from selecta.application.ports import AgentModel, ModelError, SessionStore
-from selecta.application.prompts import FALLBACK_REPLIES, PERSONA, SUMMARY
-from selecta.application.tools import SPECS, Tools
+from selecta.application.prompts import FALLBACK_REPLIES, PERSONA, SUMMARY, WAIT_LINES
+from selecta.application.tools import Tools
 from selecta.domain.brief import SLOT_ORDER
 
 logger = logging.getLogger(__name__)
@@ -28,11 +28,14 @@ class Agent:
         tools: Tools,
         store: SessionStore,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
+        say: Callable[[str], None] = lambda _: None,
     ) -> None:
+        """Wire the agent. `say` speaks a line right away, before the turn's reply is ready."""
         self._model = model
         self._tools = tools
         self._store = store
         self._now = now
+        self._say = say
 
     def start(self) -> Session:
         """Open a new session."""
@@ -74,7 +77,7 @@ class Agent:
             if key != (new_key := _state_key(session)):
                 state, key = self._state(session), new_key
             turn.contexts.append(state)
-            reply = self._model.chat(f"{PERSONA}\n\n{state}", session.messages, SPECS)
+            reply = self._model.chat(f"{PERSONA}\n\n{state}", session.messages, self._tools.specs)
             turn.model_rounds += 1
             turn.input_tokens += reply.input_tokens
             turn.output_tokens += reply.output_tokens
@@ -84,8 +87,19 @@ class Agent:
                 spoken += [reply.text] if reply.text else []
                 return " ".join(spoken) or FALLBACK_REPLIES[session.language]
             pick_before = session.pick
+            said_before = turn.said_while_waiting
+
+            def before_search(message: Message = message) -> None:
+                if turn.said_while_waiting:
+                    return
+                # The model's own text, if any, is the wait line, so the listener hears it once.
+                line = message.content or _wait_line(session)
+                message.content = line
+                turn.said_while_waiting = line
+                self._say(line)
+
             runs = [
-                ToolRun(call=call, result=self._tools.run(call, session))
+                ToolRun(call=call, result=self._tools.run(call, session, before_search))
                 for call in reply.tool_calls
             ]
             turn.tool_runs += runs
@@ -96,8 +110,9 @@ class Agent:
             # Text sent with a pick is spoken only if this round's pick was accepted.
             tried = any(r.call.name == "pick_record" for r in runs)
             if tried and (session.pick is None or session.pick == pick_before):
-                message.content = None
-            elif reply.text:
+                said_now = turn.said_while_waiting != said_before
+                message.content = turn.said_while_waiting if said_now else None
+            elif reply.text and turn.said_while_waiting == said_before:
                 spoken.append(reply.text)
         logger.warning("no answer after %d model rounds", MAX_MODEL_ROUNDS)
         fallback = FALLBACK_REPLIES[session.language]
@@ -163,3 +178,10 @@ class Agent:
 
 def _state_key(session: Session) -> str:
     return f"{session.brief.model_dump_json()}|{session.pick}|{session.rejected_ids()}"
+
+
+def _wait_line(session: Session) -> str:
+    """Return the next wait line in turn, so the same one is never said twice in a row."""
+    lines = WAIT_LINES[session.language]
+    said = sum(1 for t in session.turns if t.said_while_waiting)
+    return lines[said % len(lines)]

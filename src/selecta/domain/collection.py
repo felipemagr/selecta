@@ -73,6 +73,7 @@ class Artist(BaseModel):
     name: str
     members: list[str] = []
     profile: str | None = None
+    urls: list[str] = []
 
 
 class CollectionItem(BaseModel):
