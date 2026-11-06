@@ -1,4 +1,20 @@
 services:
+  app:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://selecta:${POSTGRES_PASSWORD}@db:5432/selecta
+      SELECTA_HOST: 0.0.0.0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
   db:
     image: pgvector/pgvector:pg17
     environment:
@@ -16,3 +32,4 @@ services:
 
 volumes:
   db:
+  data:

@@ -1,0 +1,8 @@
+# Allowlist
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!LICENSE
+!src/
+**/__pycache__
