@@ -61,6 +61,14 @@ class Pick(BaseModel):
     reason: str
 
 
+class Spoken(BaseModel):
+    """How a reply was spoken. `heard` is set only if the listener cut it off."""
+
+    lines: list[str]
+    first_audio_ms: int | None
+    heard: list[str] | None = None
+
+
 class Turn(BaseModel):
     """The trace of one listener turn."""
 
@@ -79,6 +87,7 @@ class Turn(BaseModel):
     output_tokens: int = 0
     latency_ms: int = 0
     error: str | None = None
+    spoken: Spoken | None = None
 
 
 class Rejection(BaseModel):

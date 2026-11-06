@@ -3,6 +3,8 @@
 import json
 import logging
 import time
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import httpx
@@ -61,8 +63,14 @@ class MistralChat:
         except ValidationError as e:
             raise ModelOutputError(f"{self.model} returned an invalid {schema.__name__}") from e
 
-    def chat(self, system: str, messages: list[Message], tools: list[ToolSpec]) -> Reply:
-        """Return the next reply."""
+    def chat(
+        self,
+        system: str,
+        messages: list[Message],
+        tools: list[ToolSpec],
+        on_text: Callable[[str], None] | None = None,
+    ) -> Reply:
+        """Return the next reply, streamed through `on_text` when given."""
         body: dict[str, Any] = {
             "model": self.model,
             "temperature": config.MISTRAL.AGENT_TEMPERATURE,
@@ -71,6 +79,8 @@ class MistralChat:
         }
         if tools:
             body["tools"] = [{"type": "function", "function": t.model_dump()} for t in tools]
+        if on_text:
+            return self._stream(body, on_text)
         data = _post(self._http, "/chat/completions", body)
         try:
             message = data["choices"][0]["message"]
@@ -88,6 +98,42 @@ class MistralChat:
         return Reply(
             text=message.get("content") or None,
             tool_calls=calls,
+            input_tokens=usage.get("prompt_tokens", 0),
+            output_tokens=usage.get("completion_tokens", 0),
+        )
+
+    def _stream(self, body: dict[str, Any], on_text: Callable[[str], None]) -> Reply:
+        text: list[str] = []
+        calls: dict[int, dict[str, Any]] = {}
+        usage: dict[str, int] = {}
+        try:
+            with _open_stream(self._http, "/chat/completions", {**body, "stream": True}) as lines:
+                for line in lines:
+                    if not line.startswith("data:") or line == "data: [DONE]":
+                        continue
+                    chunk = json.loads(line.removeprefix("data:"))
+                    usage = chunk.get("usage") or usage
+                    delta = chunk["choices"][0]["delta"] if chunk.get("choices") else {}
+                    if piece := delta.get("content"):
+                        text.append(piece)
+                        on_text(piece)
+                    for c in delta.get("tool_calls") or []:
+                        call = calls.setdefault(c["index"], {"id": "", "args": ""})
+                        call["id"] = c.get("id") or call["id"]
+                        if name := c["function"].get("name"):
+                            call["name"] = name
+                        call["args"] += c["function"].get("arguments") or ""
+            tool_calls = [
+                ToolCall(id=c["id"], name=c["name"], arguments=json.loads(c["args"] or "{}"))
+                for c in calls.values()
+            ]
+        except (json.JSONDecodeError, ValidationError, KeyError, TypeError, IndexError) as e:
+            raise ModelOutputError(f"{self.model} streamed a malformed reply") from e
+        except httpx.HTTPError as e:
+            raise MistralError(f"streaming from {self.model} failed: {e}") from e
+        return Reply(
+            text="".join(text) or None,
+            tool_calls=tool_calls,
             input_tokens=usage.get("prompt_tokens", 0),
             output_tokens=usage.get("completion_tokens", 0),
         )
@@ -124,6 +170,31 @@ def _post(http: httpx.Client, path: str, body: dict[str, Any]) -> dict[str, Any]
                     )
                 return response.json()
             logger.warning("%s on %s, retrying", response.status_code, path)
+        if attempt < config.MISTRAL.MAX_RETRIES - 1:
+            time.sleep(config.MISTRAL.RETRY_WAIT_SECONDS * 2**attempt)
+    raise MistralError(f"POST {path} failed after {config.MISTRAL.MAX_RETRIES} tries")
+
+
+@contextmanager
+def _open_stream(http: httpx.Client, path: str, body: dict[str, Any]) -> Iterator[Iterator[str]]:
+    """Open a streamed POST, retrying rate limits and server errors before any data arrives."""
+    streaming = False
+    for attempt in range(config.MISTRAL.MAX_RETRIES):
+        try:
+            with http.stream("POST", path, json=body) as response:
+                if response.status_code != 429 and response.status_code < 500:
+                    if response.is_error:
+                        response.read()
+                        status, detail = response.status_code, response.text
+                        raise MistralError(f"POST {path} failed: {status} {detail}")
+                    streaming = True
+                    yield response.iter_lines()
+                    return
+                logger.warning("%s on %s, retrying", response.status_code, path)
+        except httpx.TransportError as e:
+            if streaming:
+                raise
+            logger.warning("%s on %s, retrying", type(e).__name__, path)
         if attempt < config.MISTRAL.MAX_RETRIES - 1:
             time.sleep(config.MISTRAL.RETRY_WAIT_SECONDS * 2**attempt)
     raise MistralError(f"POST {path} failed after {config.MISTRAL.MAX_RETRIES} tries")

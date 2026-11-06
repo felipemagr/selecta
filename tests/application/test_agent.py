@@ -1,4 +1,5 @@
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 import pytest
@@ -30,11 +31,19 @@ class ScriptedModel:
         self.replies = list(replies)
         self.systems: list[str] = []
 
-    def chat(self, system: str, messages: list[Message], tools: list[ToolSpec]) -> Reply:
+    def chat(
+        self,
+        system: str,
+        messages: list[Message],
+        tools: list[ToolSpec],
+        on_text: Callable[[str], None] | None = None,
+    ) -> Reply:
         self.systems.append(system)
         reply = self.replies.pop(0)
         if isinstance(reply, Exception):
             raise reply
+        if on_text and reply.text:
+            on_text(reply.text)
         return reply
 
 
@@ -186,11 +195,17 @@ def test_null_slot_is_ignored() -> None:
     assert session.brief.minutes is None
 
 
-def test_text_sent_with_tool_calls_is_spoken() -> None:
-    first = Reply(text="Let me look.", tool_calls=_update().tool_calls)
-    agent, _ = _agent(ScriptedModel(first, Reply(text="What mood are you in?")))
+def test_saving_an_answer_and_asking_the_next_question_takes_one_model_call() -> None:
+    saved = _update(mood={"value": "calm", "evidence": "calm"})
+    first = Reply(text="Calm it is. How much energy?", tool_calls=saved.tool_calls)
+    agent, _ = _agent(ScriptedModel(first))
+    session = agent.start()
 
-    assert agent.reply(agent.start(), "hi") == "Let me look. What mood are you in?"
+    assert agent.reply(session, "something calm") == "Calm it is. How much energy?"
+    assert session.turns[0].model_rounds == 1
+    roles = [m.role for m in session.messages]
+    assert roles == ["user", "assistant", "tool", "assistant"]
+    assert session.messages[-1].content == "Calm it is. How much energy?"
 
 
 @pytest.mark.parametrize("language", ["en", "es", "fr"])
@@ -298,29 +313,6 @@ def test_pick_is_refused(release_id: int, asked_by_name: bool, complete: bool, r
     assert session.turns[0].tool_runs[0].result.startswith(refusal)
 
 
-def test_text_sent_with_a_refused_pick_is_not_spoken() -> None:
-    announce = Reply(text="Here's Album 9!", tool_calls=_pick(9).tool_calls)
-    agent, _ = _agent(ScriptedModel(announce, Reply(text="Let me find another.")), _record(1))
-    session = agent.start()
-    session.brief = _complete_brief()
-
-    assert agent.reply(session, "go") == "Let me find another."
-
-
-def test_text_sent_with_a_pick_dropped_in_the_same_round_is_not_spoken() -> None:
-    change = ToolCall(
-        id="u",
-        name="update_brief",
-        arguments={"language": "en", "mood": {"value": "dark", "evidence": "darker"}},
-    )
-    both = Reply(text="Here's Album 1!", tool_calls=[*_pick(1).tool_calls, change])
-    agent, _ = _agent(ScriptedModel(both, Reply(text="Darker, then.")), _record(1))
-    session = agent.start()
-    session.brief = _complete_brief()
-
-    assert agent.reply(session, "something darker") == "Darker, then."
-
-
 def test_pick_made_mid_interview_survives_answering_a_slot() -> None:
     by_name = {"release_id": 1, "reason": "asked", "asked_by_name": True}
     pick = Reply(tool_calls=[ToolCall(id="p", name="pick_record", arguments=by_name)])
@@ -407,7 +399,7 @@ def test_web_failure_is_told_to_the_model_not_raised() -> None:
 
     reply = agent.reply(session, "who produced Album 1?")
 
-    assert reply == "I can't check that right now."
+    assert reply == "Let me look that up. I can't check that right now."
     assert "can't check" in session.turns[0].tool_runs[0].result
 
 
@@ -416,13 +408,12 @@ def test_model_text_sent_with_a_search_is_the_wait_line_and_said_once() -> None:
     page = WebPage(url="https://a.example", title="A", content="Produced by B.")
     model = ScriptedModel(_look_up(text="Let me check."), Reply(text="B produced it."))
     agent, store = _agent(model, _record(1), web=FakeWeb(page))
-    agent._say = said.append
     session = agent.start()
 
-    reply = agent.reply(session, "who produced Album 1?")
+    reply = agent.reply(session, "who produced Album 1?", say=said.append)
 
-    assert said == ["Let me check."]
-    assert reply == "B produced it."
+    assert said == ["Let me check.", "B produced it."]
+    assert reply == "Let me check. B produced it."
 
 
 def _past_session(started_at: datetime, picked: int | None, rejected: dict[int, str]) -> Session:
@@ -507,3 +498,42 @@ def test_the_latest_outcome_of_a_remembered_record_wins() -> None:
     [recalled] = agent.start().memory
 
     assert (recalled.outcome, recalled.on.day) == ("picked", 3)
+
+
+def test_reply_is_spoken_sentence_by_sentence_across_rounds() -> None:
+    said: list[str] = []
+    announce = Reply(text="Here's Album 1! It's short.", tool_calls=_pick(1).tool_calls)
+    model = ScriptedModel(announce, Reply(text="Enjoy."))
+    agent, _ = _agent(model, _record(1), _record(2), _record(3))
+    session = agent.start()
+    session.brief = _complete_brief()
+
+    agent.reply(session, "go", say=said.append)
+
+    assert session.pick is not None
+    assert said == ["Here's Album 1!", "It's short.", "Enjoy."]
+
+
+def test_saving_an_answer_without_a_question_asks_in_another_call() -> None:
+    saved = _update(mood={"value": "calm", "evidence": "calm"})
+    model = ScriptedModel(
+        Reply(text="Got it.", tool_calls=saved.tool_calls), Reply(text="How much energy?")
+    )
+    agent, _ = _agent(model)
+    session = agent.start()
+
+    assert agent.reply(session, "calm") == "Got it. How much energy?"
+
+
+def test_empty_last_reply_after_speaking_ends_the_turn_without_the_fallback() -> None:
+    announce = Reply(text="Here's Album 1! It's short.", tool_calls=_pick(1).tool_calls)
+    model = ScriptedModel(announce, Reply())
+    agent, _ = _agent(model, _record(1), _record(2), _record(3))
+    session = agent.start()
+    session.brief = _complete_brief()
+
+    reply = agent.reply(session, "go")
+
+    assert reply == "Here's Album 1! It's short."
+    assert [m.role for m in session.messages][-2:] == ["tool", "assistant"]
+    assert session.messages[-1].content == reply
