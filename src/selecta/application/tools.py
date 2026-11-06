@@ -2,6 +2,7 @@
 
 import json
 import logging
+from collections.abc import Callable
 from typing import Any, get_args
 
 from pydantic import ValidationError
@@ -14,8 +15,15 @@ from selecta.application.conversation import (
     ToolCall,
     ToolSpec,
 )
+from selecta.application.lookup import Lookup
 from selecta.application.picking import FIT_NOTES, Candidates, find_candidates
-from selecta.application.ports import CollectionQuery, CollectionStore, Embedder
+from selecta.application.ports import (
+    CollectionQuery,
+    CollectionStore,
+    Embedder,
+    RerankError,
+    WebSearchError,
+)
 from selecta.application.retrieval import semantic_search
 from selecta.domain.brief import SLOT_ORDER, Brief, Occasion
 from selecta.domain.enrichment import Energy, Mood
@@ -106,6 +114,26 @@ SPECS = [
         },
     ),
     ToolSpec(
+        name="look_up",
+        description=(
+            "Look up something about one of the listener's records that its details don't say: "
+            "its story, how it was recorded, how it was received. For who plays on it, the "
+            "tracks, the label or the year, use get_release instead. Returns passages with the "
+            "URL each comes from."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "release_id": {"type": "integer"},
+                "question": {
+                    "type": "string",
+                    "description": "What they want to know, in a few words, in English.",
+                },
+            },
+            "required": ["release_id", "question"],
+        },
+    ),
+    ToolSpec(
         name="pick_record",
         description=(
             "Choose the record for the listener. Call it before you announce a pick: only a pick "
@@ -137,16 +165,29 @@ SPECS = [
 class Tools:
     """Tool executor."""
 
-    def __init__(self, store: CollectionStore, embedder: Embedder) -> None:
+    def __init__(
+        self, store: CollectionStore, embedder: Embedder, lookup: Lookup | None = None
+    ) -> None:
         self._store = store
         self._embedder = embedder
+        self._lookup = lookup
+
+    @property
+    def specs(self) -> list[ToolSpec]:
+        """Return the tools the model may call: look_up only when web lookup is set up."""
+        return [s for s in SPECS if s.name != "look_up" or self._lookup is not None]
 
     def candidates(self, session: Session) -> Candidates:
         """Return the records the agent may pick from now."""
         return find_candidates(self._store, session)
 
-    def run(self, call: ToolCall, session: Session) -> str:
-        """Return the result of a tool call. Failures are returned too, never raised."""
+    def run(
+        self, call: ToolCall, session: Session, before_search: Callable[[], None] = lambda: None
+    ) -> str:
+        """Return the result of a tool call. Failures are returned too, never raised.
+
+        `before_search` runs right before a slow web search, so the listener can be told to wait.
+        """
         args = call.arguments
         try:
             match call.name:
@@ -163,6 +204,9 @@ class Tools:
                     return self._pick(session, int(args["release_id"]), args["reason"], asked)
                 case "reject_pick":
                     return _reject(session)
+                case "look_up":
+                    release_id, question = int(args["release_id"]), str(args["question"])
+                    return self._look_up(release_id, question, before_search)
                 case "semantic_search":
                     passages = semantic_search(self._store, self._embedder, args["text"])
                     return _dump([p.model_dump() for p in passages])
@@ -173,6 +217,25 @@ class Tools:
         except Exception:
             logger.exception("tool %s failed", call.name)
             return f"{call.name} failed. Tell the listener you can't check that right now."
+
+    def _look_up(self, release_id: int, question: str, before_search: Callable[[], None]) -> str:
+        if self._lookup is None:
+            return "Unknown tool: look_up"
+        release = self._store.owned_summary(release_id)
+        if release is None:
+            return "That record isn't in the listener's collection."
+        try:
+            passages = self._lookup.passages(release, question, before_search)
+        except (WebSearchError, RerankError):
+            logger.exception("web lookup failed")
+            return "The web search failed. Tell the listener you can't check that right now."
+        if not passages:
+            return "Nothing found on the web. Say you don't know."
+        found = _dump([p.model_dump(exclude={"position"}) for p in passages])
+        return (
+            "Answer only from these passages, and say which site it comes from. If they don't "
+            f"answer the question, say you don't know.\n{found}"
+        )
 
     def _pick(self, session: Session, release_id: int, reason: str, asked_by_name: bool) -> str:
         if session.pick:

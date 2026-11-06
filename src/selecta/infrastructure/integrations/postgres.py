@@ -8,7 +8,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from selecta.application.conversation import Session
-from selecta.application.ports import Chunk, ChunkKind, CollectionQuery, Passage
+from selecta.application.ports import Chunk, ChunkKind, CollectionQuery, Passage, WebPassage
 from selecta.domain.collection import Collection, CollectionItem, Release, ReleaseSummary
 from selecta.domain.enrichment import Energy, Enrichment, Mood
 
@@ -83,9 +83,10 @@ class PostgresStore:
             )
             self._conn.cursor().executemany(
                 """
-                INSERT INTO artists VALUES (%(id)s, %(name)s, %(members)s, %(profile)s)
-                ON CONFLICT (id) DO UPDATE SET (name, members, profile)
-                    = (EXCLUDED.name, EXCLUDED.members, EXCLUDED.profile)
+                INSERT INTO artists (id, name, members, profile, urls)
+                VALUES (%(id)s, %(name)s, %(members)s, %(profile)s, %(urls)s)
+                ON CONFLICT (id) DO UPDATE SET (name, members, profile, urls)
+                    = (EXCLUDED.name, EXCLUDED.members, EXCLUDED.profile, EXCLUDED.urls)
                 """,
                 [a.model_dump(mode="json") for a in collection.artists],
             )
@@ -96,7 +97,7 @@ class PostgresStore:
                 "DELETE FROM artists WHERE id NOT IN (SELECT unnest(artist_ids) FROM releases)"
             )
             self._conn.execute(
-                "DELETE FROM chunks WHERE (kind = 'release' AND ref_id NOT IN "
+                "DELETE FROM chunks WHERE (kind IN ('release', 'web') AND ref_id NOT IN "
                 "(SELECT id FROM releases WHERE owned)) "
                 "OR (kind = 'artist' AND ref_id NOT IN (SELECT id FROM artists))"
             )
@@ -171,7 +172,9 @@ class PostgresStore:
 
     def chunk_hashes(self) -> dict[tuple[ChunkKind, int], str]:
         """Return the text hash of every stored chunk."""
-        rows = self._conn.execute("SELECT kind, ref_id, text_hash FROM chunks").fetchall()
+        rows = self._conn.execute(
+            "SELECT kind, ref_id, text_hash FROM chunks WHERE kind <> 'web'"
+        ).fetchall()
         return {(r["kind"], r["ref_id"]): r["text_hash"] for r in rows}
 
     def save_chunks(self, chunks: list[Chunk]) -> None:
@@ -180,7 +183,7 @@ class PostgresStore:
             """
             INSERT INTO chunks (kind, ref_id, text, text_hash, embedding)
             VALUES (%(kind)s, %(ref_id)s, %(text)s, %(text_hash)s, %(embedding)s::vector)
-            ON CONFLICT (kind, ref_id) DO UPDATE SET (text, text_hash, embedding)
+            ON CONFLICT (kind, ref_id, position) DO UPDATE SET (text, text_hash, embedding)
                 = (EXCLUDED.text, EXCLUDED.text_hash, EXCLUDED.embedding)
             """,
             [{**c.model_dump(), "embedding": str(c.embedding)} for c in chunks],
@@ -190,7 +193,7 @@ class PostgresStore:
         """Delete every chunk not in `keep`."""
         kinds, ref_ids = zip(*keep, strict=True) if keep else ((), ())
         self._conn.execute(
-            "DELETE FROM chunks WHERE (kind, ref_id) NOT IN "
+            "DELETE FROM chunks WHERE kind <> 'web' AND (kind, ref_id) NOT IN "
             "(SELECT * FROM unnest(%s::text[], %s::bigint[]))",
             [list(kinds), list(ref_ids)],
         )
@@ -200,23 +203,24 @@ class PostgresStore:
         rows = self._conn.execute(
             """
             WITH by_vector AS (
-                SELECT kind, ref_id, row_number() OVER (ORDER BY distance) AS rank
+                SELECT kind, ref_id, position, row_number() OVER (ORDER BY distance) AS rank
                 FROM (
-                    SELECT kind, ref_id, embedding <=> %(embedding)s::vector AS distance
-                    FROM chunks ORDER BY distance LIMIT %(candidates)s
+                    SELECT kind, ref_id, position, embedding <=> %(embedding)s::vector AS distance
+                    FROM chunks WHERE kind <> 'web'
+                    ORDER BY distance LIMIT %(candidates)s
                 ) nearest
             ), by_keyword AS (
-                SELECT kind, ref_id, row_number() OVER (ORDER BY relevance DESC) AS rank
+                SELECT kind, ref_id, position, row_number() OVER (ORDER BY relevance DESC) AS rank
                 FROM (
-                    SELECT kind, ref_id, ts_rank_cd(tsv, q) AS relevance
+                    SELECT kind, ref_id, position, ts_rank_cd(tsv, q) AS relevance
                     FROM chunks, websearch_to_tsquery('english', %(text)s) q
-                    WHERE tsv @@ q ORDER BY relevance DESC LIMIT %(candidates)s
+                    WHERE kind <> 'web' AND tsv @@ q ORDER BY relevance DESC LIMIT %(candidates)s
                 ) matching
             )
             SELECT kind, ref_id, text, sum(1.0 / (%(k)s + rank)) AS score
             FROM (SELECT * FROM by_vector UNION ALL SELECT * FROM by_keyword) ranked
-            JOIN chunks USING (kind, ref_id)
-            GROUP BY kind, ref_id, text
+            JOIN chunks USING (kind, ref_id, position)
+            GROUP BY kind, ref_id, position, text
             ORDER BY score DESC LIMIT %(limit)s
             """,
             {
@@ -228,6 +232,74 @@ class PostgresStore:
             },
         ).fetchall()
         return [Passage.model_validate(row) for row in rows]
+
+    def artist_urls(self, release_id: int) -> list[str]:
+        """Return the links Discogs lists for the release's artists."""
+        rows = self._conn.execute(
+            "SELECT unnest(a.urls) AS url FROM releases r "
+            "JOIN artists a ON a.id = ANY (r.artist_ids) WHERE r.id = %s",
+            [release_id],
+        ).fetchall()
+        return [r["url"] for r in rows]
+
+    def web_passages(self, release_id: int) -> list[WebPassage]:
+        """Return every stored web passage about the release."""
+        rows = self._conn.execute(
+            "SELECT url, text, position FROM chunks WHERE kind = 'web' AND ref_id = %s "
+            "ORDER BY position",
+            [release_id],
+        ).fetchall()
+        return [WebPassage.model_validate(row) for row in rows]
+
+    def add_web_passages(self, release_id: int, passages: list[WebPassage], keep: int) -> None:
+        """Store passages that just answered a question, then drop the least used beyond `keep`.
+
+        The passages just added count as used once and are never the ones dropped.
+        """
+        with self._conn.transaction():
+            row = self._conn.execute(
+                "SELECT coalesce(max(position) + 1, 0) AS next FROM chunks "
+                "WHERE kind = 'web' AND ref_id = %s",
+                [release_id],
+            ).fetchone()
+            first_new = row["next"] if row else 0
+            self._conn.cursor().executemany(
+                """
+                INSERT INTO chunks (kind, ref_id, position, url, text, text_hash, uses)
+                SELECT 'web', %(id)s, %(position)s, %(url)s, %(text)s, md5(%(url)s || %(text)s), 1
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM chunks WHERE kind = 'web' AND ref_id = %(id)s
+                    AND text_hash = md5(%(url)s || %(text)s)
+                )
+                """,
+                [
+                    {"id": release_id, "position": first_new + i, "url": p.url, "text": p.text}
+                    for i, p in enumerate(passages)
+                ],
+            )
+            self._conn.execute(
+                """
+                DELETE FROM chunks WHERE kind = 'web' AND ref_id = %(id)s AND position IN (
+                    SELECT position FROM chunks
+                    WHERE kind = 'web' AND ref_id = %(id)s AND position < %(first_new)s
+                    ORDER BY uses, position
+                    LIMIT greatest(
+                        (SELECT count(*) FROM chunks WHERE kind = 'web' AND ref_id = %(id)s)
+                        - %(keep)s,
+                        0
+                    )
+                )
+                """,
+                {"id": release_id, "first_new": first_new, "keep": keep},
+            )
+
+    def mark_used(self, release_id: int, positions: list[int]) -> None:
+        """Count one more use of each stored web passage."""
+        self._conn.execute(
+            "UPDATE chunks SET uses = uses + 1 "
+            "WHERE kind = 'web' AND ref_id = %s AND position = ANY (%s)",
+            [release_id, positions],
+        )
 
     def save_session(self, session: Session) -> None:
         """Insert or replace a session."""

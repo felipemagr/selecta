@@ -67,6 +67,7 @@ class Turn(BaseModel):
     started_at: datetime
     user: str
     reply: str
+    said_while_waiting: str | None = None
     contexts: list[str] = []
     tool_runs: list[ToolRun] = []
     brief_before: Brief

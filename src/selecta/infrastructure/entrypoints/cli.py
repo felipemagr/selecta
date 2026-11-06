@@ -12,10 +12,12 @@ import psycopg
 from selecta.application.agent import Agent
 from selecta.application.conversation import Session
 from selecta.application.indexing import index_collection
+from selecta.application.lookup import Lookup
 from selecta.application.retrieval import semantic_search
 from selecta.application.tools import Tools
 from selecta.infrastructure import config
-from selecta.infrastructure.integrations import mistral
+from selecta.infrastructure.integrations import cohere, mistral, tavily
+from selecta.infrastructure.integrations.cohere import CohereReranker
 from selecta.infrastructure.integrations.discogs import (
     DiscogsClient,
     DiscogsError,
@@ -24,6 +26,7 @@ from selecta.infrastructure.integrations.discogs import (
 )
 from selecta.infrastructure.integrations.mistral import MistralChat, MistralEmbedder, MistralError
 from selecta.infrastructure.integrations.postgres import PostgresStore
+from selecta.infrastructure.integrations.tavily import TavilySearch
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +44,19 @@ def _store() -> Iterator[PostgresStore]:
         yield store
     finally:
         store.close()
+
+
+@contextmanager
+def _lookup(store: PostgresStore) -> Iterator[Lookup | None]:
+    if not (config.TAVILY.API_KEY and config.COHERE.API_KEY):
+        logger.warning("TAVILY_API_KEY or COHERE_API_KEY is not set, web lookup is off")
+        yield None
+        return
+    with (
+        tavily.connect(config.TAVILY.API_KEY) as web,
+        cohere.connect(config.COHERE.API_KEY) as rerank,
+    ):
+        yield Lookup(store, TavilySearch(web), CohereReranker(rerank))
 
 
 def _export(_: argparse.Namespace) -> None:
@@ -70,17 +86,24 @@ def _search(args: argparse.Namespace) -> None:
 
 def _chat(_: argparse.Namespace) -> None:
     api_key = _require("MISTRAL_API_KEY", config.MISTRAL.API_KEY)
-    with _store() as store, mistral.connect(api_key) as http:
-        model = MistralChat(http, config.MISTRAL.AGENT_MODEL)
-        agent = Agent(model, Tools(store, MistralEmbedder(http)), store)
-        session = agent.start()
-        print(f"session {session.id}, empty line or Ctrl-D to stop")
-        try:
-            while text := _read_line():
-                print(f"selecta> {agent.reply(session, text)}")
-        except KeyboardInterrupt:
-            print()
-        _print_summary(agent, session)
+    with _store() as store, mistral.connect(api_key) as http, _lookup(store) as lookup:
+        tools = Tools(store, MistralEmbedder(http), lookup)
+        _talk(Agent(MistralChat(http, config.MISTRAL.AGENT_MODEL), tools, store, say=_say))
+
+
+def _talk(agent: Agent) -> None:
+    session = agent.start()
+    print(f"session {session.id}, empty line or Ctrl-D to stop")
+    try:
+        while text := _read_line():
+            _say(agent.reply(session, text))
+    except KeyboardInterrupt:
+        print()
+    _print_summary(agent, session)
+
+
+def _say(line: str) -> None:
+    print(f"selecta> {line}")
 
 
 def _print_summary(agent: Agent, session: Session) -> None:

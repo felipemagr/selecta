@@ -13,8 +13,9 @@ from selecta.application.conversation import (
     ToolCall,
     ToolSpec,
 )
-from selecta.application.ports import ModelError
-from selecta.application.prompts import FALLBACK_REPLIES
+from selecta.application.lookup import Lookup
+from selecta.application.ports import ModelError, Ranked, WebPage, WebPassage, WebSearchError
+from selecta.application.prompts import FALLBACK_REPLIES, WAIT_LINES
 from selecta.application.tools import Tools
 from selecta.domain.brief import Answer, Brief
 from selecta.domain.collection import ReleaseSummary
@@ -41,6 +42,7 @@ class MemoryStore:
     def __init__(self, *releases: ReleaseSummary) -> None:
         self.sessions: dict[str, Session] = {}
         self.releases = list(releases)
+        self.web: list[WebPassage] = []
 
     def owned_summaries(
         self, mood: str | None = None, energy: str | None = None
@@ -56,14 +58,47 @@ class MemoryStore:
     def load_session(self, session_id: str) -> Session | None:
         return self.sessions.get(session_id)
 
+    def artist_urls(self, release_id: int) -> list[str]:
+        return []
+
+    def web_passages(self, release_id: int) -> list[WebPassage]:
+        return []
+
+    def add_web_passages(self, release_id: int, passages: list[WebPassage], keep: int) -> None:
+        self.web += passages
+
+    def mark_used(self, release_id: int, positions: list[int]) -> None:
+        pass
+
+
+class AnswersEverything:
+    def rerank(self, query: str, documents: list[str], top_n: int) -> list[Ranked]:
+        return [Ranked(index=i, score=1) for i in range(len(documents))][:top_n]
+
+
+class FakeWeb:
+    def __init__(self, *pages: WebPage, fails: bool = False) -> None:
+        self.pages = list(pages)
+        self.fails = fails
+
+    def search(
+        self, query: str, include_domains: list[str], exclude_domains: list[str]
+    ) -> list[WebPage]:
+        if self.fails:
+            raise WebSearchError("down")
+        return self.pages
+
 
 def _update(**slots: object) -> Reply:
     return Reply(tool_calls=[ToolCall(id="c1", name="update_brief", arguments=slots)])
 
 
-def _agent(model: ScriptedModel, *releases: ReleaseSummary) -> tuple[Agent, MemoryStore]:
+def _agent(
+    model: ScriptedModel, *releases: ReleaseSummary, web: FakeWeb | None = None
+) -> tuple[Agent, MemoryStore]:
     store = MemoryStore(*releases)
-    tools = Tools(store, embedder=None)  # type: ignore[arg-type]
+    lookup = Lookup(store, web, AnswersEverything()) if web else None  # type: ignore[arg-type]
+    tools = Tools(store, embedder=None, lookup=lookup)  # type: ignore[arg-type]
     return Agent(model, tools, store, now=lambda: NOW), store  # type: ignore[arg-type]
 
 
@@ -334,3 +369,50 @@ def test_summary_keeps_key_points_when_the_model_fails() -> None:
 
     assert summary.text is None and summary.key_points["turns"] == 1
     assert store.sessions[session.id].summary == summary
+
+
+def _look_up(question: str = "who produced it", text: str | None = None) -> Reply:
+    args = {"release_id": 1, "question": question}
+    return Reply(text=text, tool_calls=[ToolCall(id="w1", name="look_up", arguments=args)])
+
+
+def test_web_search_says_a_wait_line_and_stores_what_it_found() -> None:
+    page = WebPage(url="https://en.wikipedia.org/wiki/A", title="A", content="Recorded in 1970.")
+    model = ScriptedModel(
+        _look_up("how was it recorded"), Reply(text="In 1970."), _look_up("who"), Reply(text="B.")
+    )
+    agent, store = _agent(model, _record(1), web=FakeWeb(page))
+    session = agent.start()
+
+    agent.reply(session, "how was Album 1 recorded?")
+    agent.reply(session, "and who played on it?")
+
+    first, second = (t.said_while_waiting for t in session.turns)
+    assert first == WAIT_LINES["en"][0] and second == WAIT_LINES["en"][1]
+    assert "https://en.wikipedia.org/wiki/A" in session.turns[0].tool_runs[0].result
+    assert {p.url for p in store.web} == {"https://en.wikipedia.org/wiki/A"}
+
+
+def test_web_failure_is_told_to_the_model_not_raised() -> None:
+    model = ScriptedModel(_look_up(), Reply(text="I can't check that right now."))
+    agent, _ = _agent(model, _record(1), web=FakeWeb(fails=True))
+    session = agent.start()
+
+    reply = agent.reply(session, "who produced Album 1?")
+
+    assert reply == "I can't check that right now."
+    assert "can't check" in session.turns[0].tool_runs[0].result
+
+
+def test_model_text_sent_with_a_search_is_the_wait_line_and_said_once() -> None:
+    said: list[str] = []
+    page = WebPage(url="https://a.example", title="A", content="Produced by B.")
+    model = ScriptedModel(_look_up(text="Let me check."), Reply(text="B produced it."))
+    agent, store = _agent(model, _record(1), web=FakeWeb(page))
+    agent._say = said.append
+    session = agent.start()
+
+    reply = agent.reply(session, "who produced Album 1?")
+
+    assert said == ["Let me check."]
+    assert reply == "B produced it."

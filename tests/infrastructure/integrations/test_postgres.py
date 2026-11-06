@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 
 from selecta.application.conversation import Message, Session
-from selecta.application.ports import Chunk, CollectionQuery
+from selecta.application.ports import Chunk, CollectionQuery, WebPassage
 from selecta.domain.brief import Answer, Brief
-from selecta.domain.collection import Collection, CollectionItem, Credit, Release, Track
+from selecta.domain.collection import Artist, Collection, CollectionItem, Credit, Release, Track
 from selecta.domain.enrichment import Enrichment
 from selecta.infrastructure.integrations.postgres import PostgresStore
 
@@ -142,3 +142,32 @@ def test_owned_summaries_filter_by_mood_and_skip_the_wantlist(store: PostgresSto
     assert [r.id for r in store.owned_summaries(mood="calm")] == [1]
     assert [r.id for r in store.owned_summaries()] == [1, 2]
     assert store.owned_summary(3) is None
+
+
+def _web(url: str) -> WebPassage:
+    return WebPassage(url=url, text=f"Page {url}.")
+
+
+def test_web_passages_keep_the_most_used_and_skip_duplicates(store: PostgresStore) -> None:
+    collection = _collection(_release(1, "A", 1970))
+    collection.artists = [Artist(id=1, name="A", urls=["https://a.example"])]
+    store.replace(collection)
+    store.add_web_passages(1, [_web("u0"), _web("u1"), _web("u2")], keep=3)
+    store.mark_used(1, [0, 2])
+
+    store.add_web_passages(1, [_web("u2"), _web("u3")], keep=3)
+
+    assert store.artist_urls(1) == ["https://a.example"]
+    assert [p.url for p in store.web_passages(1)] == ["u0", "u2", "u3"]
+
+
+def test_web_passages_survive_reindex_until_the_record_leaves(store: PostgresStore) -> None:
+    store.replace(_collection(_release(1, "A", 1970)))
+    store.add_web_passages(1, [_web("u0")], keep=5)
+
+    store.delete_chunks_except(set())
+    kept = store.web_passages(1)
+    store.replace(_collection(_release(2, "B", 1970)))
+
+    assert len(kept) == 1
+    assert store.web_passages(1) == []

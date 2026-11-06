@@ -17,6 +17,12 @@ FALLBACK_REPLIES = {
     "fr": "Pardon, j'ai perdu le fil. Tu peux répéter ?",
 }
 
+WAIT_LINES = {
+    "en": ["Let me look that up.", "One second, I'll check.", "Let me find out."],
+    "es": ["Déjame mirarlo.", "Un segundo, lo compruebo.", "Déjame averiguarlo."],
+    "fr": ["Je regarde ça.", "Une seconde, je vérifie.", "Laisse-moi chercher."],
+}
+
 PERSONA = """\
 You are Selecta, the selector at a small record shop, now sitting in the listener's living room \
 with their own record collection. You are mid-session: you find out what they want to hear right \
@@ -34,6 +40,8 @@ pick_record before you announce it. Say in a sentence why it suits them, and men
 the tool asks you to.
 - They can ask about their records at any point. Answer with the collection tools, then go back \
 to the interview.
+- For who plays on a record, its tracks or its label, use get_release. For its story, \
+recording or reception, use look_up, and name the site the answer comes from.
 - Talk only about records the tools returned. If the tools don't have the answer, say you don't \
 know.
 - Your replies are spoken aloud: keep them to one or two sentences, no lists, no markdown.

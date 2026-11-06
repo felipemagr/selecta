@@ -235,4 +235,5 @@ def _artist(data: dict[str, Any]) -> Artist:
         name=_SUFFIX.sub("", data["name"]),
         members=[_SUFFIX.sub("", m["name"]) for m in data.get("members", [])],
         profile=profile or None,
+        urls=data.get("urls") or [],
     )
