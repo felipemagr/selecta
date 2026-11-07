@@ -1,4 +1,4 @@
-.PHONY: install test check quality db export index sync
+.PHONY: install test check quality db export index sync eval
 
 UV_RUN := uv run $(if $(wildcard .env),--env-file .env)
 
@@ -28,3 +28,6 @@ index: db
 
 sync: db
 	$(UV_RUN) selecta sync
+
+eval:  # live evals
+	$(UV_RUN) python -m tests.evals.run $(ARGS)

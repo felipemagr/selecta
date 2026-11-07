@@ -8,9 +8,11 @@ from selecta.application.speech import SentenceStream, sentences
     [
         ("Waves Vol. 2. It's calm.", ["Waves Vol. 2.", "It's calm."]),
         ("**Blue Harbour** it is! ¿Te gusta?", ["Blue Harbour it is!", "¿Te gusta?"]),
+        ("Here\u2014Blue Harbour, 1970\u20131975.", ["Here, Blue Harbour, 1970\u20131975."]),
+        ("Calm \u2013 and short.", ["Calm, and short."]),
     ],
 )
-def test_sentences_split_for_speech_without_markup(text: str, expected: list[str]) -> None:
+def test_sentences_are_spoken_without_markup_or_dashes(text: str, expected: list[str]) -> None:
     assert sentences(text) == expected
 
 

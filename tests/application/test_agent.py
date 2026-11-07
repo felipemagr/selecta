@@ -593,6 +593,12 @@ def test_play_record_reports_what_the_player_did(playable: int, result: str, tol
     assert len(played) == (1 if playable else 0)
 
 
+def test_play_record_is_hidden_without_a_music_server() -> None:
+    tools = Tools(MemoryStore(), embedder=None, music_server=False)  # type: ignore[arg-type]
+
+    assert "play_record" not in [s.name for s in tools.specs(can_play=True)]
+
+
 def test_play_record_is_only_offered_with_a_player() -> None:
     model = ScriptedModel(Reply(text="Hi."))
     agent, _ = _agent(model)
@@ -623,6 +629,18 @@ def test_playing_a_named_record_picks_it_in_the_same_call() -> None:
     agent.reply(session, "play Album 1", play=lambda r, t: played.append(t) or "playing")  # type: ignore[arg-type,func-returns-value]
 
     assert session.pick is not None and len(played) == 1
+
+
+def test_playing_a_named_record_too_long_for_their_time_says_so() -> None:
+    call = ToolCall(id="pl", name="play_record", arguments={"release_id": 1})
+    model = ScriptedModel(Reply(tool_calls=[call]), Reply(text="Enjoy."))
+    agent, _ = _agent(model, _record(1, minutes=120))
+    session = agent.start()
+    session.brief = _complete_brief()
+
+    agent.reply(session, "play Album 1", play=lambda r, t: "playing")  # type: ignore[arg-type]
+
+    assert "runs well past their time" in session.turns[0].tool_runs[0].result
 
 
 def test_playing_an_unknown_record_asks_to_search_first() -> None:

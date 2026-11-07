@@ -1,0 +1,303 @@
+{
+ "1001": {
+  "mood": "warm",
+  "energy": "medium",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "B1",
+   "B2",
+   "B3",
+   "B4"
+  ]
+ },
+ "1002": {
+  "mood": "melancholic",
+  "energy": "low",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "B1",
+   "B2",
+   "B3",
+   "B4"
+  ]
+ },
+ "1003": {
+  "mood": "upbeat",
+  "energy": "high",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "B1",
+   "B2",
+   "B3"
+  ]
+ },
+ "1004": {
+  "mood": "calm",
+  "energy": "low",
+  "playable": [
+   "A1",
+   "A2",
+   "B1",
+   "B2"
+  ]
+ },
+ "1005": {
+  "mood": "upbeat",
+  "energy": "medium",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "B1",
+   "B2",
+   "B3"
+  ]
+ },
+ "1006": {
+  "mood": "intense",
+  "energy": "high",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "B1",
+   "B2",
+   "B3"
+  ]
+ },
+ "1007": {
+  "mood": "warm",
+  "energy": "low",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "B1",
+   "B2",
+   "B3"
+  ]
+ },
+ "1008": {
+  "mood": "dark",
+  "energy": "medium",
+  "playable": []
+ },
+ "1009": {
+  "mood": "upbeat",
+  "energy": "high",
+  "playable": [
+   "A1",
+   "A2",
+   "B1",
+   "B2"
+  ]
+ },
+ "1010": {
+  "mood": "melancholic",
+  "energy": "low",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "A5",
+   "B1",
+   "B2",
+   "B3",
+   "B4",
+   "B5"
+  ]
+ },
+ "1011": {
+  "mood": "intense",
+  "energy": "high",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "A5",
+   "B1",
+   "B2",
+   "B3",
+   "B4",
+   "B5"
+  ]
+ },
+ "1012": {
+  "mood": "warm",
+  "energy": "medium",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "B1",
+   "B2"
+  ]
+ },
+ "1013": {
+  "mood": "warm",
+  "energy": "medium",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "B1",
+   "B2",
+   "B3",
+   "B4"
+  ]
+ },
+ "1014": {
+  "mood": "calm",
+  "energy": "low",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "B1",
+   "B2",
+   "B3"
+  ]
+ },
+ "1015": {
+  "mood": "dark",
+  "energy": "high",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "B1",
+   "B2",
+   "B3"
+  ]
+ },
+ "1016": {
+  "mood": "calm",
+  "energy": "medium",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "B1",
+   "B2",
+   "B3",
+   "B4"
+  ]
+ },
+ "1017": {
+  "mood": "upbeat",
+  "energy": "medium",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "A5",
+   "B1",
+   "B2",
+   "B3",
+   "B4",
+   "B5"
+  ]
+ },
+ "1018": {
+  "mood": "dark",
+  "energy": "low",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "A5",
+   "B1",
+   "B2",
+   "B3",
+   "B4"
+  ]
+ },
+ "1019": {
+  "mood": "upbeat",
+  "energy": "high",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "A5",
+   "A6",
+   "B1",
+   "B2",
+   "B3",
+   "B4",
+   "B5",
+   "B6"
+  ]
+ },
+ "1020": {
+  "mood": "melancholic",
+  "energy": "medium",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "B1"
+  ]
+ },
+ "1021": {
+  "mood": "calm",
+  "energy": "low",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "B1",
+   "B2",
+   "B3",
+   "B4"
+  ]
+ },
+ "1022": {
+  "mood": "intense",
+  "energy": "high",
+  "playable": [
+   "A1",
+   "A2",
+   "B1",
+   "B2"
+  ]
+ },
+ "1023": {
+  "mood": "calm",
+  "energy": "medium",
+  "playable": []
+ },
+ "1024": {
+  "mood": "upbeat",
+  "energy": "high",
+  "playable": [
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "B1",
+   "B2",
+   "B3",
+   "B4"
+  ]
+ }
+}

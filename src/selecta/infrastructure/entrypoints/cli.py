@@ -7,6 +7,7 @@ import logging
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 import httpx
 import psycopg
@@ -16,6 +17,7 @@ from selecta.application.agent import Agent
 from selecta.application.conversation import Session
 from selecta.application.indexing import index_collection
 from selecta.application.lookup import Lookup
+from selecta.application.ports import CollectionSource
 from selecta.application.retrieval import semantic_search
 from selecta.application.tools import Tools
 from selecta.application.voice import VoiceSession
@@ -23,6 +25,7 @@ from selecta.infrastructure import config
 from selecta.infrastructure.entrypoints.server import create_app
 from selecta.infrastructure.integrations import cohere, mistral, navidrome, tavily, voxtral
 from selecta.infrastructure.integrations.cohere import CohereReranker
+from selecta.infrastructure.integrations.collection_file import CollectionFile, CollectionFileError
 from selecta.infrastructure.integrations.discogs import (
     DiscogsClient,
     DiscogsError,
@@ -83,10 +86,12 @@ def _export(_: argparse.Namespace) -> None:
         export(client, config.DISCOGS.OUT_DIR)
 
 
-def _index(_: argparse.Namespace) -> None:
+def _index(args: argparse.Namespace) -> None:
     api_key = _require("MISTRAL_API_KEY", config.MISTRAL.API_KEY)
     with _store() as store, mistral.connect(api_key) as http, _library() as library:
-        source = DiscogsExport(config.DISCOGS.OUT_DIR)
+        source: CollectionSource = (
+            CollectionFile(args.source) if args.source else DiscogsExport(config.DISCOGS.OUT_DIR)
+        )
         index_collection(source, store, MistralChat(http), MistralEmbedder(http), library)
 
 
@@ -106,7 +111,7 @@ def _search(args: argparse.Namespace) -> None:
 def _chat(_: argparse.Namespace) -> None:
     api_key = _require("MISTRAL_API_KEY", config.MISTRAL.API_KEY)
     with _store() as store, mistral.connect(api_key) as http, _lookup(store) as lookup:
-        tools = Tools(store, MistralEmbedder(http), lookup)
+        tools = Tools(store, MistralEmbedder(http), lookup, bool(config.NAVIDROME.URL))
         _talk(Agent(MistralChat(http, config.MISTRAL.AGENT_MODEL), tools, store))
 
 
@@ -114,7 +119,7 @@ def _serve(_: argparse.Namespace) -> None:
     api_key = _require("MISTRAL_API_KEY", config.MISTRAL.API_KEY)
     speech = voxtral.connect(api_key)
     with _store() as store, mistral.connect(api_key) as http, _lookup(store) as lookup:
-        tools = Tools(store, MistralEmbedder(http), lookup)
+        tools = Tools(store, MistralEmbedder(http), lookup, bool(config.NAVIDROME.URL))
         agent = Agent(MistralChat(http, config.MISTRAL.AGENT_MODEL), tools, store)
 
         async def open_session() -> VoiceSession:
@@ -197,6 +202,10 @@ def main() -> None:
         ("serve", _serve, "run the voice server with its push-to-talk page"),
     ]:
         commands.add_parser(name, help=text).set_defaults(run=run)
+    commands.choices["index"].add_argument(
+        "--from", dest="source", type=Path, help="a collection JSON file, such as the sample"
+    )
+    commands.choices["sync"].set_defaults(source=None)
     search = commands.choices["search"]
     search.add_argument("text")
     search.add_argument("--limit", type=int, default=5)
@@ -205,7 +214,7 @@ def main() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     try:
         args.run(args)
-    except (DiscogsError, MistralError) as e:
+    except (DiscogsError, MistralError, CollectionFileError) as e:
         sys.exit(str(e))
     except psycopg.OperationalError as e:
         sys.exit(f"database unavailable: {e}")

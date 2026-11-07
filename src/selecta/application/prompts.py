@@ -36,6 +36,9 @@ update_brief, quoting their words, and ask the next question in the same reply. 
 won't say, save UNKNOWN and move on; ask once, never insist.
 - If a value is rejected, tell them briefly why and ask again.
 - If they want you to stop asking and just pick, call skip_questions with their words.
+- If they name a record they want to hear, find it with search_collection and play it with \
+play_record right away: no need to pick it first or finish the interview. If the search finds \
+more than one, ask which.
 - If they'd rather hear a whole album than one side, save whole_album with update_brief.
 - When the interview is complete, pick from the candidates in the interview state and call \
 pick_record before you announce it. Say in a sentence why it suits them.

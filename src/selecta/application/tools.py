@@ -4,6 +4,7 @@ import json
 import logging
 from collections.abc import Callable
 from typing import Any, get_args
+from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
@@ -121,7 +122,6 @@ SPECS = [
             "type": "object",
             "properties": {
                 "release_id": {"type": "integer"},
-                "track": {"type": "string", "description": "Track to start from."},
             },
             "required": ["release_id"],
         },
@@ -194,35 +194,47 @@ SPECS = [
         ),
         parameters={
             "type": "object",
-            "properties": {"release_id": {"type": "integer"}},
+            "properties": {
+                "release_id": {"type": "integer"},
+                "track": {
+                    "type": "string",
+                    "description": "Where to start: a vinyl position (B1) or a track number (3).",
+                },
+            },
             "required": ["release_id"],
         },
     ),
 ]
 
 Play = Callable[[Release, list[PlayableTrack]], PlaybackResult]
+PICKED = "Picked, not playing yet."
 
 
 class Tools:
     """Tool executor."""
 
     def __init__(
-        self, store: CollectionStore, embedder: Embedder, lookup: Lookup | None = None
+        self,
+        store: CollectionStore,
+        embedder: Embedder,
+        lookup: Lookup | None = None,
+        music_server: bool = True,
     ) -> None:
         self._store = store
         self._embedder = embedder
         self._lookup = lookup
+        self._music_server = music_server
 
     def specs(self, can_play: bool) -> list[ToolSpec]:
         """Return the tools the model may call: look_up and play_record only when set up."""
         unavailable = {"look_up"} if self._lookup is None else set()
-        if not can_play:
+        if not (can_play and self._music_server):
             unavailable.add("play_record")
         return [s for s in SPECS if s.name not in unavailable]
 
     def candidates(self, session: Session) -> Candidates:
-        """Return the records the agent may pick from now."""
-        return find_candidates(self._store, session)
+        """Return the records the agent may pick from now: playable ones, with a music server."""
+        return find_candidates(self._store, session, playable=self._music_server)
 
     def run(
         self,
@@ -254,7 +266,7 @@ class Tools:
                     return self._pick(session, int(args["release_id"]), args["reason"], asked)
                 case "reject_pick":
                     return _reject(session)
-                case "play_record" if play:
+                case "play_record" if play and self._music_server:
                     track = str(args["track"]) if args.get("track") else None
                     return self._play(session, int(args["release_id"]), play, track)
                 case "look_up":
@@ -284,14 +296,17 @@ class Tools:
             if start is None:
                 return f"There's no track {track} on the server for that record. Tell the listener."
             tracks = tracks[start:]
-        picked = ""
+        notes = ""
         if session.pick is None or session.pick.release_id != release_id:
             picked = self._pick(session, release_id, "They asked to hear it.", asked_by_name=True)
             if session.pick is None or session.pick.release_id != release_id:
                 return picked
+            notes = picked.removeprefix(PICKED).strip()
         match play(release, tracks):
             case "playing":
-                return f"{picked} Playing: {len(tracks)} tracks, from {tracks[0].title}.".strip()
+                following = f"; next is {_track(tracks[1])}" if len(tracks) > 1 else ""
+                playing = f"Playing: {len(tracks)} tracks, from {_track(tracks[0])}{following}."
+                return f"{playing} {notes}".strip()
             case "cancelled":
                 return "The listener spoke over you, so it wasn't started. Listen to them first."
             case _:
@@ -309,11 +324,21 @@ class Tools:
             logger.exception("web lookup failed")
             return "The web search failed. Tell the listener you can't check that right now."
         if not passages:
-            return "Nothing found on the web. Say you don't know."
-        found = _dump([p.model_dump(exclude={"position"}) for p in passages])
+            return (
+                "Nothing found on the web. Who plays on it is in get_release; otherwise say you "
+                "don't know."
+            )
+        found = _dump(
+            [
+                {"site": urlparse(p.url).hostname or p.url, **p.model_dump(exclude={"position"})}
+                for p in passages
+            ]
+        )
+        site = urlparse(passages[0].url).hostname or "the site"
         return (
-            "Answer only from these passages, and say which site it comes from. If they don't "
-            f"answer the question, say you don't know.\n{found}"
+            f"Answer only from these passages, starting with where it comes from, like "
+            f"\"According to {site}, ...\". If they don't answer the question, say you don't "
+            f"know.\n{found}"
         )
 
     def _pick(self, session: Session, release_id: int, reason: str, asked_by_name: bool) -> str:
@@ -339,8 +364,12 @@ class Tools:
         minutes = session.brief.listening_minutes()
         note = f" It replaces {replaced.title}." if replaced else ""
         if runs_past(release.duration_seconds, minutes, MUCH_LONGER_FACTOR):
-            return f"Picked.{note} {MUCH_LONGER_NOTE}"
-        return f"Picked.{note}"
+            return f"{PICKED}{note} {MUCH_LONGER_NOTE}"
+        return f"{PICKED}{note}"
+
+
+def _track(track: PlayableTrack) -> str:
+    return f"{track.position} {track.title}"
 
 
 def _track_index(tracks: list[PlayableTrack], track: str) -> int | None:
