@@ -19,7 +19,7 @@ from selecta.application.ports import ModelError, Ranked, WebPage, WebPassage, W
 from selecta.application.prompts import FALLBACK_REPLIES, WAIT_LINES
 from selecta.application.tools import Tools
 from selecta.domain.brief import Answer, Brief
-from selecta.domain.collection import ReleaseSummary
+from selecta.domain.collection import Release, ReleaseSummary
 from selecta.domain.library import PlayableTrack
 
 NOW = datetime(2026, 11, 5, 21, 0, tzinfo=UTC)
@@ -67,6 +67,11 @@ class MemoryStore:
 
     def owned_summary(self, release_id: int) -> ReleaseSummary | None:
         return next((r for r in self.releases if r.id == release_id), None)
+
+    def get_release(self, release_id: int) -> Release | None:
+        if (r := self.owned_summary(release_id)) is None:
+            return None
+        return Release(id=r.id, title=r.title, artists=r.artists, artist_ids=[])
 
     def save_session(self, session: Session) -> None:
         self.sessions[session.id] = session.model_copy(deep=True)
@@ -559,7 +564,7 @@ def _play_turn(
 ) -> tuple[Session, list[list[PlayableTrack]], ScriptedModel]:
     played: list[list[PlayableTrack]] = []
 
-    def play(tracks: list[PlayableTrack]) -> str:
+    def play(release: Release, tracks: list[PlayableTrack]) -> str:
         played.append(tracks)
         return result
 
@@ -615,7 +620,7 @@ def test_playing_a_named_record_picks_it_in_the_same_call() -> None:
     agent, _ = _agent(ScriptedModel(Reply(tool_calls=[call]), Reply(text="Enjoy.")), _record(1))
     session = agent.start()
 
-    agent.reply(session, "play Album 1", play=lambda t: played.append(t) or "playing")  # type: ignore[arg-type,func-returns-value]
+    agent.reply(session, "play Album 1", play=lambda r, t: played.append(t) or "playing")  # type: ignore[arg-type,func-returns-value]
 
     assert session.pick is not None and len(played) == 1
 
@@ -625,7 +630,7 @@ def test_playing_an_unknown_record_asks_to_search_first() -> None:
     agent, _ = _agent(ScriptedModel(Reply(tool_calls=[call]), Reply(text="Hm.")), _record(1))
     session = agent.start()
 
-    agent.reply(session, "play Album 1", play=lambda t: "playing")  # type: ignore[arg-type]
+    agent.reply(session, "play Album 1", play=lambda r, t: "playing")  # type: ignore[arg-type]
 
     assert session.pick is None
     assert "search_collection" in session.turns[0].tool_runs[0].result
@@ -648,7 +653,7 @@ def test_play_can_start_at_a_given_track(track: str, first: str | None, told: st
     session = agent.start()
     session.pick = Pick(release_id=1, title="Album 1", artists=["Someone"], reason="x")
 
-    agent.reply(session, "the next one", play=lambda t: played.append(t) or "playing")  # type: ignore[arg-type,func-returns-value]
+    agent.reply(session, "the next one", play=lambda r, t: played.append(t) or "playing")  # type: ignore[arg-type,func-returns-value]
 
     assert told in session.turns[0].tool_runs[0].result
     assert (played[0][0].song_id if played else None) == first
