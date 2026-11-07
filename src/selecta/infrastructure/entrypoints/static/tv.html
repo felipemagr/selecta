@@ -23,7 +23,7 @@
   html, body { height: 100%; overflow: hidden; background: var(--black); color: var(--white); }
   body { font-family: var(--sans); -webkit-font-smoothing: antialiased; cursor: none;
          user-select: none; -webkit-user-select: none; }
-  .layer { position: fixed; inset: 0; transition: opacity 600ms var(--ease-out); }
+  .layer { position: fixed; inset: 0; transition: opacity 600ms var(--ease-out); will-change: opacity; }
   .tag { font: 400 1.45vh/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--grey); }
 
   /* Corners: the name, and what Selecta is doing right now. */
@@ -40,7 +40,7 @@
            font-variation-settings: "ROND" 100; transition: transform 2s var(--ease-in-out); }
 
   /* The record. */
-  #record { opacity: 0; display: grid; grid-template-columns: 62vh 1fr; gap: 8vh; align-items: center;
+  #record { opacity: 0; display: grid; grid-template-columns: 62vh minmax(0, 1fr); gap: 8vh; align-items: center;
             padding: 0 calc(var(--edge) * 2); }
   body.playing #record { opacity: 1; }
   body.playing #idle { opacity: 0; }
@@ -55,14 +55,20 @@
   #tracks { margin-top: 5.5vh; height: 21vh; overflow: hidden;
             -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
   #tracklist { transition: transform 700ms var(--ease-in-out); padding: 0; list-style: none; }
-  #tracklist li { display: grid; grid-template-columns: 2.4vh 6vh 1fr auto; align-items: center; height: 4.2vh;
+  #tracklist li { display: grid; grid-template-columns: 2.4vh 6vh minmax(0, 1fr) auto; align-items: center; height: 4.2vh;
                   font: 400 2.2vh/1 var(--sans); color: var(--faint); transition: color 400ms ease; }
   #tracklist li::before { content: ""; }
   #tracklist li.now { color: var(--white); }
   #tracklist li.now::before { width: 0.9vh; height: 0.9vh; border-radius: 50%; background: var(--red); }
+  #tracklist .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 2vh; }
   #tracklist .pos, #tracklist .len { font: 400 1.7vh/1 var(--mono); letter-spacing: 0.08em; font-variant-numeric: tabular-nums; }
-  #time { display: flex; align-items: center; gap: 2vh; margin-top: 3vh; }
-  #bar { flex: 1; height: 1.2vh; min-width: 0; }
+  #song { margin-top: 3.4vh; font: 400 3vh/1.2 var(--sans); white-space: nowrap; overflow: hidden;
+          text-overflow: ellipsis; }
+  #time { display: flex; align-items: center; gap: 2vh; margin-top: 1.6vh; }
+  #elapsed, #left { flex: none; width: 7vh; font-variant-numeric: tabular-nums; }
+  #left { text-align: right; }
+  /* width 0 + flex 1: the canvas fills the row without its pixel size widening the column. */
+  #bar { flex: 1; width: 0; height: 1.4vh; }
 
   /* The conversation, over everything. */
   #talk { opacity: 0; }
@@ -80,15 +86,17 @@
           transition: opacity 500ms ease; }
   .line.past { opacity: 0.3; }
   .line.problem { color: var(--red); }
-  .w { opacity: 0; filter: blur(0.4vh); transition: opacity 260ms var(--ease-out), filter 260ms var(--ease-out); }
-  .w.on { opacity: 1; filter: none; }
+  .line.gone { opacity: 0; transition-duration: 400ms; }
+  .w { display: inline-block; opacity: 0; transform: translateY(0.12em);
+       transition: opacity 280ms var(--ease-out), transform 360ms var(--ease-out); }
+  .w.on { opacity: 1; transform: none; }
 
   #note { position: fixed; right: var(--edge); bottom: var(--edge); }
   #note:empty { display: none; }
 
   @media (prefers-reduced-motion: reduce) {
     #glyph, #tracklist, #clock, #halftone { transition: none; }
-    .w { filter: none; }
+    .w { transform: none; }
   }
 </style>
 </head>
@@ -104,7 +112,8 @@
     <div id="artist"></div>
     <div class="tag" id="meta"></div>
     <div id="tracks"><ol id="tracklist"></ol></div>
-    <div id="time"><span class="tag" id="elapsed">0:00</span><canvas id="bar"></canvas><span class="tag" id="total"></span></div>
+    <div id="song"></div>
+    <div id="time"><span class="tag" id="elapsed">0:00</span><canvas id="bar"></canvas><span class="tag" id="left"></span></div>
   </div>
 </section>
 <section class="layer" id="talk">
@@ -115,7 +124,7 @@
 <script type="module">
 import { Glyph } from "/static/glyph.js";
 
-const SPEECH_RATE = 24000, LINGER_SECONDS = 7, MAX_LINES = 3, DUCKED = 0.15;
+const SPEECH_RATE = 24000, LINGER_SECONDS = 5, MAX_LINES = 3, DUCKED = 0.15;
 const $ = id => document.getElementById(id);
 const ctx = new AudioContext();
 const voice = ctx.createAnalyser();
@@ -193,27 +202,44 @@ function speak(samples) {
   nextStart = line.end = start + buffer.duration;
 }
 
-// Each line shows when its voice starts, word by word at the pace it is spoken.
+// Each line shows when its voice starts; its words appear as the voice reaches them.
 function show(line) {
   const el = document.createElement("p");
   el.className = line.problem ? "line problem" : "line";
-  const words = line.text.split(/\s+/);
-  const seconds = line.end !== null ? line.end - line.start : words.length * 0.12;
-  const step = Math.min(0.32, seconds / words.length) * 1000;
-  words.forEach((word, i) => {
+  line.words = line.text.split(/\s+/).map(word => {
     const span = document.createElement("span");
     span.className = "w"; span.textContent = word;
     el.append(span, " ");
-    setTimeout(() => span.classList.add("on"), i * step);
+    return span;
   });
+  // Where each word starts, as a share of the line's letters: long words take longer to say.
+  const total = line.text.replace(/\s+/g, "").length || 1;
+  let before = 0;
+  line.at = line.words.map(span => { const at = before / total; before += span.textContent.length; return at; });
+  line.shownAt = ctx.currentTime;
   flip(() => {
-    const shown = [...$("lines").children];
+    const shown = [...$("lines").querySelectorAll(".line:not(.gone)")];
     shown.forEach(p => p.classList.add("past"));
-    shown.slice(0, Math.max(0, shown.length - MAX_LINES + 1)).forEach(p => p.remove());
+    shown.slice(0, Math.max(0, shown.length - MAX_LINES + 1)).forEach(p => {
+      p.classList.add("gone");
+      setTimeout(() => p.remove(), 500);
+    });
     $("lines").append(el);
   });
   line.el = el;
   setTalk("speaking");
+}
+
+// The share of the line said so far. Until all of a line's audio has arrived, its length is
+// taken as at least a normal speaking pace, so the words can't run ahead of the voice.
+const SECONDS_PER_LETTER = 0.07;
+function reveal(line, now, complete) {
+  if (line.shown === line.words.length) return;
+  const paced = line.text.replace(/\s+/g, "").length * SECONDS_PER_LETTER;
+  const heard = line.end !== null ? line.end - line.start : 0;
+  const share = (now - (line.start ?? line.shownAt)) / Math.max(0.1, complete && heard ? heard : Math.max(heard, paced));
+  line.shown = line.at.filter(at => at <= share).length;
+  line.words.slice(0, line.shown).forEach(span => span.classList.add("on"));
 }
 
 // Lines move up smoothly when a new one pushes them.
@@ -232,7 +258,7 @@ const wave = new Float32Array(voice.fftSize);
 setInterval(() => {
   const now = ctx.currentTime;
   lines.forEach((line, i) => {
-    if (line.el) return;
+    if (line.el) return reveal(line, now, turnDone || i < lines.length - 1);
     const before = lines[i - 1];
     const ready = before === undefined || (before.el && (before.end === null || before.end <= now));
     const voiced = line.start !== null && line.start <= now + 0.05;
@@ -279,6 +305,7 @@ function start() {
   [...$("tracklist").children].forEach((li, i) => li.classList.toggle("now", i === index));
   $("tracklist").style.transform = `translateY(${-Math.max(0, index - 1) * 4.2}vh)`;
   $("where").textContent = `${track.position}  ·  ${index + 1} / ${queue.length}`;
+  $("song").textContent = track.title;
   music.src = track.url;
   music.play().catch(() => { if (mine === record) report("play_failed"); });
   document.body.classList.add("playing"); awake();
@@ -303,20 +330,27 @@ music.addEventListener("error", () => {
   if (told) { index += 1; start(); } else report("play_failed");
 });
 
-// Progress as a row of dots: played ones white, the playhead red.
+// Progress as a row of dots: played ones white, the playhead red. Redrawn only when it moves.
+const DOTS = 48;
+let drawn = "";
 function progress() {
+  if (!document.body.classList.contains("playing")) return;
   const bar = $("bar"), width = bar.clientWidth * 2, height = bar.clientHeight * 2;
-  if (!width || !document.body.classList.contains("playing")) return;
+  const length = Number.isFinite(music.duration) ? music.duration : 0;
+  const head = length ? Math.min(DOTS - 1, Math.floor((music.currentTime / length) * DOTS)) : 0;
+  const now = Math.floor(music.currentTime || 0), left = Math.max(0, Math.floor(length) - now);
+  const state = `${width}:${index}:${Math.floor(length)}:${head}:${now}`;
+  if (!width || state === drawn) return;
+  drawn = state;
+  $("elapsed").textContent = clock(now);
+  $("left").textContent = length ? `-${clock(left)}` : "";
   if (bar.width !== width) { bar.width = width; bar.height = height; }
-  const g = bar.getContext("2d"), r = height / 2, count = Math.floor(width / (r * 3));
-  const share = music.duration ? music.currentTime / music.duration : 0, head = Math.floor(share * count);
+  const g = bar.getContext("2d"), r = height / 2, step = (width - 2 * r) / (DOTS - 1);
   g.clearRect(0, 0, width, height);
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < DOTS; i++) {
     g.fillStyle = i === head ? "#d71921" : i < head ? "#fff" : "rgb(255 255 255 / 0.22)";
-    g.beginPath(); g.arc(r + i * r * 3, r, i === head ? r : r * 0.62, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(r + i * step, r, i === head ? r : r * 0.55, 0, Math.PI * 2); g.fill();
   }
-  $("elapsed").textContent = clock(Math.floor(music.currentTime || 0));
-  $("total").textContent = music.duration ? clock(Math.floor(music.duration)) : "";
 }
 
 // The music steps back while the listener talks and the agent speaks.
