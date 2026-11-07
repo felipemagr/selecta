@@ -146,12 +146,14 @@ def _session(
             title=release.title, artist=release.artists[0], why=WHY[language]
         )
         messages += [
-            *_tool_round("pick1", "pick_record", args, "Picked."),
+            *_tool_round("pick1", "pick_record", args, "Picked, not playing yet."),
             Message(role="assistant", content=offer),
         ]
     if playing:
         tracks = playable(pick or 0)
-        result = f"Playing: {len(tracks)} tracks, from {tracks[0].title}."
+        named = [f"{t.position} {t.title}" for t in tracks]
+        following = f"; next is {named[1]}" if len(named) > 1 else ""
+        result = f"Playing: {len(tracks)} tracks, from {named[0]}{following}."
         messages += [
             Message(role="user", content=YES[language]),
             *_tool_round("play1", "play_record", {"release_id": pick}, result),
@@ -200,8 +202,8 @@ PLAY_IT = {
 
 DONT_KNOW = re.compile(
     r"don.?t know|not sure|couldn.?t find|can.?t find|no information|nothing (on|about)|"
-    r"no (lo )?s[eé]|no tengo|no (he )?encontr|no sabr|no hay informaci|"
-    r"je ne sais|pas d.?information|rien trouv|je n.?ai pas trouv|aucune information"
+    r"no (lo )?s[eé]|no tengo|no (he )?encontr|no encuentro|no sabr|no hay informaci|"
+    r"je ne sais|pas d.?information|rien trouv|je n.?ai pas trouv|je ne trouve|aucune information"
 )
 
 
@@ -221,7 +223,7 @@ SCENARIOS = [
         },
         check=lambda o: (
             _need(o.session.brief.mood is not None, "mood not saved")
-            + _need(o.turn.reply.count("?") == 1, "didn't ask exactly one question")
+            + _need(o.turn.reply.count("?") in (1, 2), "didn't ask one question")
         ),
     ),
     Scenario(

@@ -12,7 +12,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from selecta.application.conversation import Message, Session
-from tests.evals.checks import invariants
+from selecta.application.ports import ModelError
+from tests.evals.checks import invariants, language_of
 from tests.evals.scenarios import Outcome
 from tests.evals.world import Player, build_agent
 
@@ -24,8 +25,10 @@ LISTENER = """\
 You are role-playing a person at home talking to Selecta, a voice assistant that picks a record \
 from your own vinyl collection and plays it. Speak {language}. {persona}
 
-Reply with only what you would say out loud: one or two short sentences, casual, no stage \
-directions. When the music has started and you're happy, say goodbye."""
+This is a live conversation, one turn at a time. React only to what Selecta just said: don't \
+refer to records it hasn't mentioned, and never write Selecta's lines. Reply with only what you \
+would say out loud: one or two short sentences, casual, no stage directions. Say goodbye only once \
+Selecta says the music is playing."""
 
 
 @dataclass
@@ -35,13 +38,6 @@ class Persona:
     name: str
     brief: str
     goal: Callable[[Session], str | None] = lambda session: None
-    # A listener who changes language: to which, and after how many of their replies.
-    switch_to: str | None = None
-    switch_after: int = 0
-
-    def language(self, base: str, turn: int) -> str:
-        """Return the language the listener speaks on this turn, counting from 1."""
-        return self.switch_to if self.switch_to and turn > self.switch_after else base
 
 
 def _turned_one_down(session: Session) -> str | None:
@@ -71,8 +67,8 @@ PERSONAS = [
     ),
     Persona(
         "picky",
-        "You want something energetic for a small party. Turn down the first record offered, "
-        "saying it isn't your thing, then accept the second.",
+        "You want something energetic for a small party. When Selecta names the first record "
+        "for you, turn that record down, saying it isn't your thing. Accept the second one.",
         goal=_turned_one_down,
     ),
     Persona(
@@ -85,8 +81,6 @@ PERSONAS = [
         "language switcher",
         "Start in {language}, but after two replies switch to English for the rest. You want "
         "something upbeat, around thirty minutes, just for you.",
-        switch_to="en",
-        switch_after=2,
     ),
 ]
 
@@ -103,9 +97,13 @@ def converse(
     # The listener's own view: Selecta's lines are the other side of the conversation.
     heard: list[Message] = [Message(role="user", content="(Selecta is listening.)")]
     failures: list[str] = []
+    spoken = language
     started = time.monotonic()
     for _ in range(MAX_TURNS):
-        said = listener_model.chat(system, heard, [])
+        try:
+            said = listener_model.chat(system, heard, [])
+        except ModelError as e:
+            return {"error": f"listener: {e}"}
         text = (said.text or "").strip()
         heard.append(Message(role="assistant", content=text))
         pick_before = session.pick
@@ -113,7 +111,7 @@ def converse(
         turn = session.turns[-1]
         if turn.error:
             return {"error": turn.error}
-        spoken = persona.language(language, len(session.turns))
+        spoken = language_of(text) or spoken
         outcome = Outcome(spoken, session, turn, world, player, pick_before)
         failures += [f"turn {len(session.turns)}: {f}" for f in invariants(outcome)]
         heard.append(Message(role="user", content=turn.reply))

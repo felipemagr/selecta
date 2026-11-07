@@ -631,6 +631,18 @@ def test_playing_a_named_record_picks_it_in_the_same_call() -> None:
     assert session.pick is not None and len(played) == 1
 
 
+def test_playing_a_named_record_too_long_for_their_time_says_so() -> None:
+    call = ToolCall(id="pl", name="play_record", arguments={"release_id": 1})
+    model = ScriptedModel(Reply(tool_calls=[call]), Reply(text="Enjoy."))
+    agent, _ = _agent(model, _record(1, minutes=120))
+    session = agent.start()
+    session.brief = _complete_brief()
+
+    agent.reply(session, "play Album 1", play=lambda r, t: "playing")  # type: ignore[arg-type]
+
+    assert "runs well past their time" in session.turns[0].tool_runs[0].result
+
+
 def test_playing_an_unknown_record_asks_to_search_first() -> None:
     call = ToolCall(id="pl", name="play_record", arguments={"release_id": 999})
     agent, _ = _agent(ScriptedModel(Reply(tool_calls=[call]), Reply(text="Hm.")), _record(1))

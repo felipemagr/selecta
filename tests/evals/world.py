@@ -187,16 +187,11 @@ class NoWeb:
         return []
 
 
-class SharedWords:
-    """A reranker that keeps the passages sharing a word with the question."""
+class KeepsAll:
+    """A reranker that finds every passage relevant: the evals don't test web relevance."""
 
     def rerank(self, query: str, documents: list[str], top_n: int) -> list[Ranked]:
-        words = {w for w in _words(query) if len(w) > 3}
-        scored = [
-            Ranked(index=i, score=0.9 if words & _words(d) else 0.0)
-            for i, d in enumerate(documents)
-        ]
-        return sorted(scored, key=lambda r: r.score, reverse=True)[:top_n]
+        return [Ranked(index=i, score=1.0) for i in range(len(documents))][:top_n]
 
 
 class NoEmbeddings:
@@ -227,7 +222,7 @@ class Scripted:
 def build_agent(model: Any) -> tuple[Agent, World]:
     """Return the real agent wired to a fresh world, as the server wires it to the real one."""
     world = World()
-    lookup = Lookup(world, NoWeb(), SharedWords())  # type: ignore[arg-type]
+    lookup = Lookup(world, NoWeb(), KeepsAll())  # type: ignore[arg-type]
     tools = Tools(world, NoEmbeddings(), lookup)  # type: ignore[arg-type]
     return Agent(model, tools, world, now=lambda: NOW), world  # type: ignore[arg-type]
 

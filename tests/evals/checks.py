@@ -11,8 +11,8 @@ from tests.evals.world import fold
 WORDS = {
     "en": "the and is it you to of this that what for with your i how something would like it's "
     "i'd on do",
-    "es": "el los las y es un una para con te lo por que algo tu este esta quieres ya pongo del "
-    "muy si mas",
+    "es": "el los las y es una para con lo por algo tu este esta quieres ya pongo del muy si mas "
+    "pero",
     "fr": "le les et est une pour avec tu vous ce cette je ca des du quel quelle oui pas mets "
     "c'est j'ai au",
 }
@@ -21,7 +21,7 @@ MARKERS = {lang: set(words.split()) for lang, words in WORDS.items()}
 PLAYING_CLAIM = re.compile(
     r"\b(now playing|is playing|it'?s playing|playing now|here it comes|starting it now|"
     r"ya suena|esta sonando|ahi va|ya lo tienes sonando|te lo pongo ya|"
-    r"c'?est lance|ca joue|je le lance|c'?est parti)\b"
+    r"c'?est lance|ca joue|c'?est parti|(?<!que )je le lance(?! ?\?))\b"
 )
 MAX_SENTENCES = 3
 MARKDOWN = re.compile(r"(\*\*|^#|^\s*[-*] |`)", re.M)

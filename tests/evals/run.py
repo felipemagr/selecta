@@ -12,7 +12,7 @@ import statistics
 import time
 from collections import Counter
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -26,7 +26,7 @@ from tests.evals.simulate import PERSONAS, converse
 from tests.evals.world import Player, Scripted, build_agent
 
 OUT_DIR = Path("data/evals")
-WORKERS = 8
+WORKERS = 4
 # A run the model didn't answer (a rate limit, an outage) is tried again before it's reported.
 ATTEMPTS = 3
 RETRY_WAIT_SECONDS = 20
@@ -79,10 +79,11 @@ def main() -> None:
             for lang in LANGUAGES
             for _ in range(args.k)
         ]
+        out = _out("simulated")
         runs = _execute(
-            jobs, lambda j: converse(model, listener, personas[j["case"]], j["language"])
+            jobs, lambda j: converse(model, listener, personas[j["case"]], j["language"]), out
         )
-        _write("simulated", _simulated_report(runs, model.model, args.k), runs)
+        _write(out, _simulated_report(runs, model.model, args.k))
     else:
         scenarios = {s.name: s for s in SCENARIOS}
         jobs = [
@@ -93,14 +94,15 @@ def main() -> None:
             for says in s.says[lang]
             for _ in range(args.k)
         ]
+        out = _out("turns")
         runs = _execute(
-            jobs, lambda j: run_once(model, scenarios[j["case"]], j["language"], j["says"])
+            jobs, lambda j: run_once(model, scenarios[j["case"]], j["language"], j["says"]), out
         )
-        _write("turns", _report(runs, model.model, args.k), runs)
+        _write(out, _report(runs, model.model, args.k))
 
 
 def _execute(
-    jobs: list[dict[str, Any]], run: Callable[[dict[str, Any]], dict[str, Any]]
+    jobs: list[dict[str, Any]], run: Callable[[dict[str, Any]], dict[str, Any]], out: Path
 ) -> list[dict[str, Any]]:
     """Run every job in parallel, retrying runs the model didn't answer, and merge the results."""
 
@@ -116,15 +118,25 @@ def _execute(
             time.sleep(RETRY_WAIT_SECONDS * (n + 1))
         return {**job, **result}
 
-    print(f"{len(jobs)} runs")
-    with ThreadPoolExecutor(WORKERS) as pool:
-        return list(pool.map(attempt, jobs))
+    runs = []
+    with ThreadPoolExecutor(WORKERS) as pool, (out / "runs.jsonl").open("w") as log:
+        for future in as_completed([pool.submit(attempt, job) for job in jobs]):
+            runs.append(future.result())
+            log.write(json.dumps(runs[-1], ensure_ascii=False) + "\n")
+            log.flush()
+            if len(runs) % 10 == 0 or len(runs) == len(jobs):
+                failed = sum(not _passed(r) for r in runs)
+                print(f"{len(runs)}/{len(jobs)} done, {failed} not passed")
+    return runs
 
 
-def _write(kind: str, report: str, runs: list[dict[str, Any]]) -> None:
+def _out(kind: str) -> Path:
     out = OUT_DIR / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}"
     out.mkdir(parents=True, exist_ok=True)
-    (out / "runs.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in runs))
+    return out
+
+
+def _write(out: Path, report: str) -> None:
     (out / "report.md").write_text(report)
     print(report)
     print(f"written to {out}")
@@ -163,7 +175,7 @@ def _report(runs: list[dict[str, Any]], model: str, k: int) -> str:
         f"**pass^{k}: {at_k}/{total} cases.**",
         *_failures(runs),
     ]
-    if answered := [r for r in runs if "error" not in r]:
+    if answered := [r for r in runs if "seconds" in r]:
         seconds = sorted(r["seconds"] for r in answered)
         p90 = statistics.quantiles(seconds, n=10)[-1] if len(seconds) > 1 else seconds[0]
         lines += [
@@ -183,7 +195,8 @@ def _report(runs: list[dict[str, Any]], model: str, k: int) -> str:
         "that something is playing are read with simple word rules, so they can miss or misread "
         "a reply.",
         "- Not measured: whether facts the agent says are true beyond the checked ones, tone, "
-        "and anything about speech (transcription, voices, timing).",
+        "web relevance (a record's stored passages always count as relevant), and anything "
+        "about speech (transcription, voices, timing).",
     ]
     return "\n".join(lines) + "\n"
 
@@ -197,7 +210,7 @@ def _simulated_report(runs: list[dict[str, Any]], model: str, k: int) -> str:
             group = [r for r in mine if r["language"] == lang]
             ok = sum(_passed(r) for r in group)
             cells.append(f"{ok}/{len(group)}{' pass^k' if group and ok == len(group) else ''}")
-        answered = [r for r in mine if "error" not in r] or [{"turns": 0, "tokens": 0}]
+        answered = [r for r in mine if "turns" in r] or [{"turns": 0, "tokens": 0}]
         turns = statistics.mean(r["turns"] for r in answered)
         tokens = statistics.mean(r["tokens"] for r in answered)
         rows.append(f"| {persona} | {' | '.join(cells)} | {turns:.1f} | {tokens:,.0f} |")
@@ -217,6 +230,8 @@ def _simulated_report(runs: list[dict[str, Any]], model: str, k: int) -> str:
         "",
         "- The listener is a model following a short persona, not a person: real listeners are "
         "messier, and the same model plays both sides.",
+        "- The simulated listener sometimes breaks its script (it turns a record down before one "
+        "is offered, or asks about one nobody mentioned); those runs count as failures.",
         "- Tokens are the agent's only, not the simulated listener's.",
     ]
     return "\n".join(lines) + "\n"
