@@ -4,6 +4,7 @@ Each scenario tests a capability, says it two ways per language, and checks what
 (tools, arguments, session state), not its wording. Invariants in checks.py apply to every run.
 """
 
+import json
 import re
 import uuid
 from collections.abc import Callable
@@ -107,7 +108,11 @@ SWITCH_FROM = {"en": "es", "es": "fr", "fr": "en"}
 def _session(
     language: str, answered: int, pick: int | None = None, playing: bool = False
 ) -> Session:
-    """Return a session `answered` slots into the interview, optionally with a pick or playing."""
+    """Return a session `answered` slots into the interview, optionally with a pick or playing.
+
+    The history is what the real agent leaves: each answer saved with update_brief, the pick
+    made with pick_record, playback started with play_record, each with its result.
+    """
     slots = list(ASK)
     brief = Brief(
         **{
@@ -115,14 +120,20 @@ def _session(
             for slot in slots[:answered]
         }
     )
-    messages = [Message(role="user", content=HI[language])]
-    for slot in slots[:answered]:
+    messages = [
+        Message(role="user", content=HI[language]),
+        Message(role="assistant", content=ASK["mood"][language]),
+    ]
+    for i, slot in enumerate(slots[:answered]):
+        following = slots[i + 1] if i + 1 < len(slots) else None
+        saved = {"value": VALUES[slot], "evidence": ANSWER[slot][language]}
+        result = {"saved": [slot], "rejected": {}, "next_slot": following}
         messages += [
-            Message(role="assistant", content=ASK[slot][language]),
             Message(role="user", content=ANSWER[slot][language]),
+            *_tool_round(f"brief{i}", "update_brief", {slot: saved, "language": language}, result),
         ]
-    if answered < len(slots) and pick is None:
-        messages.append(Message(role="assistant", content=ASK[slots[answered]][language]))
+        if following:
+            messages.append(Message(role="assistant", content=ASK[following][language]))
     # Each run gets its own id: candidates are shuffled by it, as each real session's are.
     session = Session(id=uuid.uuid4().hex, started_at=NOW, language=language, brief=brief)
     if pick is not None:
@@ -130,22 +141,33 @@ def _session(
         session.pick = Pick(
             release_id=pick, title=release.title, artists=release.artists, reason=WHY[language]
         )
+        args = {"release_id": pick, "reason": WHY[language]}
         offer = OFFER[language].format(
             title=release.title, artist=release.artists[0], why=WHY[language]
         )
-        messages.append(Message(role="assistant", content=offer))
+        messages += [
+            *_tool_round("pick1", "pick_record", args, "Picked."),
+            Message(role="assistant", content=offer),
+        ]
     if playing:
-        call = ToolCall(id="play1", name="play_record", arguments={"release_id": pick})
         tracks = playable(pick or 0)
         result = f"Playing: {len(tracks)} tracks, from {tracks[0].title}."
         messages += [
             Message(role="user", content=YES[language]),
-            Message(role="assistant", tool_calls=[call]),
-            Message(role="tool", content=result, tool_call_id="play1", name="play_record"),
+            *_tool_round("play1", "play_record", {"release_id": pick}, result),
             Message(role="assistant", content=PLAYING[language]),
         ]
     session.messages = messages
     return session
+
+
+def _tool_round(id: str, name: str, arguments: dict, result: object) -> list[Message]:
+    """Return a tool call the agent made and the result it got, as the history keeps them."""
+    content = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False)
+    return [
+        Message(role="assistant", tool_calls=[ToolCall(id=id, name=name, arguments=arguments)]),
+        Message(role="tool", content=content, tool_call_id=id, name=name),
+    ]
 
 
 def _runs(o: Outcome, name: str) -> list[ToolRun]:
