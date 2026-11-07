@@ -5,11 +5,14 @@ from collections.abc import Callable
 
 _SENTENCE_END = re.compile(r"(?<=[.!?…])\s+(?=[A-ZÀ-ÝÑ¿¡\"“'])")
 _MARKUP = re.compile(r"[*_#`]")
+# We *do* hate em dashes.
+_DASH = re.compile(r"\s*\u2014\s*|\s+\u2013\s+")
 
 
 def sentences(text: str) -> list[str]:
-    """Return the text as sentences to speak one by one, without markup."""
-    return [s for s in _SENTENCE_END.split(_MARKUP.sub("", text).strip()) if s]
+    """Return the text as sentences to speak one by one, without markup or dashes."""
+    plain = _DASH.sub(", ", _MARKUP.sub("", text)).strip()
+    return [s for s in _SENTENCE_END.split(plain) if s]
 
 
 class SentenceStream:

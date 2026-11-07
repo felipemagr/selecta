@@ -593,6 +593,12 @@ def test_play_record_reports_what_the_player_did(playable: int, result: str, tol
     assert len(played) == (1 if playable else 0)
 
 
+def test_play_record_is_hidden_without_a_music_server() -> None:
+    tools = Tools(MemoryStore(), embedder=None, music_server=False)  # type: ignore[arg-type]
+
+    assert "play_record" not in [s.name for s in tools.specs(can_play=True)]
+
+
 def test_play_record_is_only_offered_with_a_player() -> None:
     model = ScriptedModel(Reply(text="Hi."))
     agent, _ = _agent(model)

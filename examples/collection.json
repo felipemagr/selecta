@@ -1,0 +1,2218 @@
+{
+ "releases": [
+  {
+   "id": 1001,
+   "title": "Harbour Lights",
+   "artists": [
+    "The Low Lanterns"
+   ],
+   "artist_ids": [
+    50018
+   ],
+   "year": 1971,
+   "original_year": 1971,
+   "label": "Greyfield Records",
+   "country": "UK",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Rock"
+   ],
+   "styles": [
+    "Folk Rock"
+   ],
+   "notes": "Recorded in four days in a converted chapel on the coast. The band's second album and the one that made their name.",
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Harbour Lights",
+     "duration_seconds": 283,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Salt on the Window",
+     "duration_seconds": 237,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Ferry at Dawn",
+     "duration_seconds": 369,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Rope and Anchor",
+     "duration_seconds": 216,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "The Keeper's Daughter",
+     "duration_seconds": 338,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Low Tide Waltz",
+     "duration_seconds": 294,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Grey Gulls",
+     "duration_seconds": 213,
+     "artists": []
+    },
+    {
+     "position": "B4",
+     "title": "Lantern Song",
+     "duration_seconds": 331,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Rosa Kell",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Ada Brannigan",
+     "role": "Drums",
+     "tracks": ""
+    },
+    {
+     "name": "Miles Corrin",
+     "role": "Guitar",
+     "tracks": ""
+    },
+    {
+     "name": "Hal Pemberton",
+     "role": "Producer",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1002,
+   "title": "Cartas al Mar",
+   "artists": [
+    "Marisol Vega"
+   ],
+   "artist_ids": [
+    50011
+   ],
+   "year": 1978,
+   "original_year": 1978,
+   "label": "Sello Brisa",
+   "country": "Spain",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Latin"
+   ],
+   "styles": [
+    "Bolero"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Cartas al Mar",
+     "duration_seconds": 195,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "La Última Ola",
+     "duration_seconds": 293,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Silencio en la Playa",
+     "duration_seconds": 203,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Te Espero en el Puerto",
+     "duration_seconds": 208,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Noche de Faro",
+     "duration_seconds": 291,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Arena y Sal",
+     "duration_seconds": 391,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Despedida",
+     "duration_seconds": 217,
+     "artists": []
+    },
+    {
+     "position": "B4",
+     "title": "Volver al Sur",
+     "duration_seconds": 241,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Marisol Vega",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Julián Esteve",
+     "role": "Guitar",
+     "tracks": ""
+    },
+    {
+     "name": "Pilar Romero",
+     "role": "Arranged By",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1003,
+   "title": "Night Shift Disco",
+   "artists": [
+    "Orbit Club"
+   ],
+   "artist_ids": [
+    50014
+   ],
+   "year": 1979,
+   "original_year": 1979,
+   "label": "Velvet Dial",
+   "country": "US",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Funk / Soul"
+   ],
+   "styles": [
+    "Disco"
+   ],
+   "notes": "A dance-floor favourite: the title track ran over nine minutes on the 12-inch.",
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Night Shift",
+     "duration_seconds": 430,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Mirror Ball Mary",
+     "duration_seconds": 530,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Get Up, Get Down",
+     "duration_seconds": 414,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Velvet Rope",
+     "duration_seconds": 358,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Last Train Groove",
+     "duration_seconds": 539,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Saturday Satellite",
+     "duration_seconds": 249,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Dee Carmichael",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Ronnie Vale",
+     "role": "Bass",
+     "tracks": ""
+    },
+    {
+     "name": "Sam Okonjo",
+     "role": "Drums",
+     "tracks": ""
+    },
+    {
+     "name": "Lena Fisk",
+     "role": "Producer",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1004,
+   "title": "Slow Tides",
+   "artists": [
+    "Quiet Harbour Ensemble"
+   ],
+   "artist_ids": [
+    50015
+   ],
+   "year": 1986,
+   "original_year": 1986,
+   "label": "Saltmarsh",
+   "country": "Norway",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Electronic"
+   ],
+   "styles": [
+    "Ambient"
+   ],
+   "notes": "Four long pieces built from synthesizer drones and recordings of the sea.",
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Slow Tides I",
+     "duration_seconds": 1138,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Slow Tides II",
+     "duration_seconds": 735,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Fog Over the Fjord",
+     "duration_seconds": 633,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Still Water",
+     "duration_seconds": 614,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Eira Lund",
+     "role": "Synthesizer",
+     "tracks": ""
+    },
+    {
+     "name": "Tor Vang",
+     "role": "Field Recording",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1005,
+   "title": "Boulevard Électrique",
+   "artists": [
+    "Les Néons"
+   ],
+   "artist_ids": [
+    50009
+   ],
+   "year": 1983,
+   "original_year": 1983,
+   "label": "Disques Lumen",
+   "country": "France",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Electronic"
+   ],
+   "styles": [
+    "Synth-pop"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Boulevard Électrique",
+     "duration_seconds": 246,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Minuit à Pigalle",
+     "duration_seconds": 364,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Les Néons",
+     "duration_seconds": 216,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Cœur Digital",
+     "duration_seconds": 310,
+     "artists": []
+    },
+    {
+     "position": "A5",
+     "title": "Taxi pour Deux",
+     "duration_seconds": 323,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Pluie de Lumière",
+     "duration_seconds": 261,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Ville Blanche",
+     "duration_seconds": 302,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Dernier Métro",
+     "duration_seconds": 189,
+     "artists": []
+    },
+    {
+     "position": "B4",
+     "title": "Chanson Mécanique",
+     "duration_seconds": 188,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Claire Dumas",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Jean-Paul Rivet",
+     "role": "Synthesizer",
+     "tracks": ""
+    },
+    {
+     "name": "Marc Aubert",
+     "role": "Drum Machine",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1006,
+   "title": "Steel Horizon",
+   "artists": [
+    "Iron Meridian"
+   ],
+   "artist_ids": [
+    50007
+   ],
+   "year": 1974,
+   "original_year": 1974,
+   "label": "Anvil Road",
+   "country": "UK",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Rock"
+   ],
+   "styles": [
+    "Hard Rock"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Steel Horizon",
+     "duration_seconds": 307,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Thunder Mile",
+     "duration_seconds": 460,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Red Engine",
+     "duration_seconds": 378,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Burn the Bridge",
+     "duration_seconds": 342,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Black Lightning",
+     "duration_seconds": 429,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Highway Saint",
+     "duration_seconds": 387,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "The Long Fall",
+     "duration_seconds": 337,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Gus Harlow",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Nick Tremaine",
+     "role": "Guitar",
+     "tracks": ""
+    },
+    {
+     "name": "Bobby Quist",
+     "role": "Drums",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1007,
+   "title": "Late Set at the Corner",
+   "artists": [
+    "Theo Marsh Trio"
+   ],
+   "artist_ids": [
+    50019
+   ],
+   "year": 1962,
+   "original_year": 1962,
+   "label": "Bluefield",
+   "country": "US",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Jazz"
+   ],
+   "styles": [
+    "Hard Bop"
+   ],
+   "notes": "Recorded live on a Sunday night at a small club; you can hear the glasses and the room.",
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Corner Blues",
+     "duration_seconds": 440,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Lamplight",
+     "duration_seconds": 413,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Midnight Crossing",
+     "duration_seconds": 283,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "For Ruthie",
+     "duration_seconds": 377,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Third Avenue",
+     "duration_seconds": 363,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Last Call",
+     "duration_seconds": 463,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Theo Marsh",
+     "role": "Piano",
+     "tracks": ""
+    },
+    {
+     "name": "Ike Fenwick",
+     "role": "Bass",
+     "tracks": ""
+    },
+    {
+     "name": "Lou Barretto",
+     "role": "Drums",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1008,
+   "title": "Hollow Season",
+   "artists": [
+    "Cinder & Ash"
+   ],
+   "artist_ids": [
+    50001
+   ],
+   "year": 1994,
+   "original_year": 1994,
+   "label": "Northgate",
+   "country": "UK",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Rock"
+   ],
+   "styles": [
+    "Shoegaze"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Hollow Season",
+     "duration_seconds": 351,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Static Bloom",
+     "duration_seconds": 246,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Drown the Lights",
+     "duration_seconds": 410,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Paper Moon",
+     "duration_seconds": 206,
+     "artists": []
+    },
+    {
+     "position": "A5",
+     "title": "Wintering",
+     "duration_seconds": 277,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Fade Like Smoke",
+     "duration_seconds": 358,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Glass Rain",
+     "duration_seconds": 214,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Undertow",
+     "duration_seconds": 294,
+     "artists": []
+    },
+    {
+     "position": "B4",
+     "title": "Ghost Signal",
+     "duration_seconds": 187,
+     "artists": []
+    },
+    {
+     "position": "B5",
+     "title": "Last Embers",
+     "duration_seconds": 336,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Mara Quill",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Owen Strand",
+     "role": "Guitar",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1009,
+   "title": "Market Day",
+   "artists": [
+    "Kalimba Collective"
+   ],
+   "artist_ids": [
+    50008
+   ],
+   "year": 1976,
+   "original_year": 1976,
+   "label": "Sunrise Coast",
+   "country": "Ghana",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Funk / Soul"
+   ],
+   "styles": [
+    "Afrobeat"
+   ],
+   "notes": "Long, horn-driven grooves made for dancing, each one taking up most of a side.",
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Market Day",
+     "duration_seconds": 592,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Kofi's Horn",
+     "duration_seconds": 517,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Dust and Drums",
+     "duration_seconds": 635,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Celebration Road",
+     "duration_seconds": 416,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Kwame Asante",
+     "role": "Saxophone",
+     "tracks": ""
+    },
+    {
+     "name": "Efua Mensah",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Yaw Boateng",
+     "role": "Drums",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1010,
+   "title": "Fado da Tarde",
+   "artists": [
+    "Inês Duarte"
+   ],
+   "artist_ids": [
+    50006
+   ],
+   "year": 1969,
+   "original_year": 1969,
+   "label": "Ribeira",
+   "country": "Portugal",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Folk, World, & Country"
+   ],
+   "styles": [
+    "Fado"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Fado da Tarde",
+     "duration_seconds": 199,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Saudade do Rio",
+     "duration_seconds": 185,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Rua Estreita",
+     "duration_seconds": 183,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Barco Negro do Sul",
+     "duration_seconds": 166,
+     "artists": []
+    },
+    {
+     "position": "A5",
+     "title": "Lisboa à Noite",
+     "duration_seconds": 219,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Xaile Azul",
+     "duration_seconds": 233,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Canção do Cais",
+     "duration_seconds": 169,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Janela Fechada",
+     "duration_seconds": 195,
+     "artists": []
+    },
+    {
+     "position": "B4",
+     "title": "Maré Vazia",
+     "duration_seconds": 112,
+     "artists": []
+    },
+    {
+     "position": "B5",
+     "title": "Adeus",
+     "duration_seconds": 200,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Inês Duarte",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Rui Matos",
+     "role": "Portuguese Guitar",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1011,
+   "title": "Machine Weather",
+   "artists": [
+    "Hexagon Pulse"
+   ],
+   "artist_ids": [
+    50005
+   ],
+   "year": 1997,
+   "original_year": 1997,
+   "label": "Gridlock",
+   "country": "Germany",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Electronic"
+   ],
+   "styles": [
+    "Techno"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Pressure Front",
+     "duration_seconds": 500,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Machine Weather",
+     "duration_seconds": 624,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Isobar",
+     "duration_seconds": 563,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Cold Front",
+     "duration_seconds": 370,
+     "artists": []
+    },
+    {
+     "position": "A5",
+     "title": "Storm Cell",
+     "duration_seconds": 406,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Barometer",
+     "duration_seconds": 508,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Lightning Grid",
+     "duration_seconds": 276,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Eye of the Storm",
+     "duration_seconds": 434,
+     "artists": []
+    },
+    {
+     "position": "B4",
+     "title": "Clearing",
+     "duration_seconds": 329,
+     "artists": []
+    },
+    {
+     "position": "B5",
+     "title": "After the Rain",
+     "duration_seconds": 310,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Kai Reuter",
+     "role": "Producer",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1012,
+   "title": "Back Porch Songs",
+   "artists": [
+    "Willow Creek Band"
+   ],
+   "artist_ids": [
+    50021
+   ],
+   "year": 1972,
+   "original_year": 1972,
+   "label": "Greyfield Records",
+   "country": "US",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Rock"
+   ],
+   "styles": [
+    "Country Rock"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Back Porch",
+     "duration_seconds": 165,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Sweet Clover",
+     "duration_seconds": 310,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Dusty Boots",
+     "duration_seconds": 179,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Sunday River",
+     "duration_seconds": 203,
+     "artists": []
+    },
+    {
+     "position": "A5",
+     "title": "Two Lanes Home",
+     "duration_seconds": 233,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Old Dog Blues",
+     "duration_seconds": 331,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Lantern in the Barn",
+     "duration_seconds": 169,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Harvest Moon Rising",
+     "duration_seconds": 245,
+     "artists": []
+    },
+    {
+     "position": "B4",
+     "title": "Goodnight Kentucky",
+     "duration_seconds": 265,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Jesse Calloway",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Dot Haines",
+     "role": "Fiddle",
+     "tracks": ""
+    },
+    {
+     "name": "Earl Briggs",
+     "role": "Pedal Steel",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1013,
+   "title": "Velvet Hours",
+   "artists": [
+    "Nadia Okafor"
+   ],
+   "artist_ids": [
+    50013
+   ],
+   "year": 1975,
+   "original_year": 1975,
+   "label": "Velvet Dial",
+   "country": "US",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Funk / Soul"
+   ],
+   "styles": [
+    "Soul"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Velvet Hours",
+     "duration_seconds": 316,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Hold Me Slow",
+     "duration_seconds": 304,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Sweet Talk",
+     "duration_seconds": 313,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Honey on the Radio",
+     "duration_seconds": 199,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Stay Till Morning",
+     "duration_seconds": 226,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Golden",
+     "duration_seconds": 215,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Little Sunday",
+     "duration_seconds": 317,
+     "artists": []
+    },
+    {
+     "position": "B4",
+     "title": "Lay It Down",
+     "duration_seconds": 331,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Nadia Okafor",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Curtis Bell",
+     "role": "Bass",
+     "tracks": ""
+    },
+    {
+     "name": "The Velvet Strings",
+     "role": "Strings",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1014,
+   "title": "Nocturnes for a Small Room",
+   "artists": [
+    "Glasshouse Strings"
+   ],
+   "artist_ids": [
+    50003
+   ],
+   "year": 2008,
+   "original_year": 2008,
+   "label": "Saltmarsh",
+   "country": "Iceland",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Classical"
+   ],
+   "styles": [
+    "Modern Classical"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Nocturne I",
+     "duration_seconds": 322,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Nocturne II",
+     "duration_seconds": 331,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Nocturne III",
+     "duration_seconds": 351,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Window Light",
+     "duration_seconds": 352,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Nocturne IV",
+     "duration_seconds": 442,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Small Room",
+     "duration_seconds": 479,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Nocturne V",
+     "duration_seconds": 362,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Sigrún Hall",
+     "role": "Piano",
+     "tracks": ""
+    },
+    {
+     "name": "The Glasshouse Quartet",
+     "role": "Strings",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1015,
+   "title": "Funeral of the Sun",
+   "artists": [
+    "Black Pines"
+   ],
+   "artist_ids": [
+    50000
+   ],
+   "year": 1971,
+   "original_year": 1971,
+   "label": "Anvil Road",
+   "country": "UK",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Rock"
+   ],
+   "styles": [
+    "Doom Metal"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Funeral of the Sun",
+     "duration_seconds": 247,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Grave Lanterns",
+     "duration_seconds": 383,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "The Crow King",
+     "duration_seconds": 367,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Ashen Field",
+     "duration_seconds": 432,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Black Pines",
+     "duration_seconds": 558,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Requiem for Fire",
+     "duration_seconds": 472,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Morgan Vey",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Dirk Halloran",
+     "role": "Guitar",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1016,
+   "title": "Concrete Island Dub",
+   "artists": [
+    "Dub Atlas"
+   ],
+   "artist_ids": [
+    50002
+   ],
+   "year": 1977,
+   "original_year": 1977,
+   "label": "Riverside Sound",
+   "country": "Jamaica",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Reggae"
+   ],
+   "styles": [
+    "Dub"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Concrete Island",
+     "duration_seconds": 223,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Echo Chamber Rock",
+     "duration_seconds": 241,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Bassline Shelter",
+     "duration_seconds": 252,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Rooftop Version",
+     "duration_seconds": 142,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Harbour Dub",
+     "duration_seconds": 291,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Slow Rider",
+     "duration_seconds": 270,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Tape Delay Dawn",
+     "duration_seconds": 287,
+     "artists": []
+    },
+    {
+     "position": "B4",
+     "title": "Island Version",
+     "duration_seconds": 273,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Desmond Clarke",
+     "role": "Mixed By",
+     "tracks": ""
+    },
+    {
+     "name": "Lloyd Barnes",
+     "role": "Bass",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1017,
+   "title": "Samba do Quintal",
+   "artists": [
+    "Sol Ferreira"
+   ],
+   "artist_ids": [
+    50017
+   ],
+   "year": 1973,
+   "original_year": 1973,
+   "label": "Disco Tropical",
+   "country": "Brazil",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Latin"
+   ],
+   "styles": [
+    "Samba"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Samba do Quintal",
+     "duration_seconds": 207,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Morro Azul",
+     "duration_seconds": 208,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Tamborim",
+     "duration_seconds": 155,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Feira de Domingo",
+     "duration_seconds": 251,
+     "artists": []
+    },
+    {
+     "position": "A5",
+     "title": "Batucada da Rua",
+     "duration_seconds": 147,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Caju",
+     "duration_seconds": 148,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Vento de Março",
+     "duration_seconds": 174,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Pandeiro Novo",
+     "duration_seconds": 165,
+     "artists": []
+    },
+    {
+     "position": "B4",
+     "title": "Noite na Laje",
+     "duration_seconds": 198,
+     "artists": []
+    },
+    {
+     "position": "B5",
+     "title": "Até Amanhã",
+     "duration_seconds": 146,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Sol Ferreira",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Zeca Lima",
+     "role": "Cavaquinho",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1018,
+   "title": "Static Prayers",
+   "artists": [
+    "Moth Radio"
+   ],
+   "artist_ids": [
+    50012
+   ],
+   "year": 2003,
+   "original_year": 2003,
+   "label": "Northgate",
+   "country": "UK",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Electronic"
+   ],
+   "styles": [
+    "Trip Hop"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Static Prayers",
+     "duration_seconds": 228,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Low Signal",
+     "duration_seconds": 274,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Moth to Flame",
+     "duration_seconds": 259,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Cold Tea",
+     "duration_seconds": 338,
+     "artists": []
+    },
+    {
+     "position": "A5",
+     "title": "Night Bus",
+     "duration_seconds": 236,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Tape Hiss",
+     "duration_seconds": 494,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Lullaby for Machines",
+     "duration_seconds": 414,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Grey Hours",
+     "duration_seconds": 273,
+     "artists": []
+    },
+    {
+     "position": "B4",
+     "title": "Signal Lost",
+     "duration_seconds": 305,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Iris Monroe",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Dex Holloway",
+     "role": "Producer",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1019,
+   "title": "Saturday Stomp",
+   "artists": [
+    "Ruby Lane & The Sparks"
+   ],
+   "artist_ids": [
+    50016
+   ],
+   "year": 1966,
+   "original_year": 1966,
+   "label": "Bluefield",
+   "country": "US",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Rock"
+   ],
+   "styles": [
+    "Garage Rock"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Saturday Stomp",
+     "duration_seconds": 120,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Hey Little Rocket",
+     "duration_seconds": 122,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Dance Till Dawn",
+     "duration_seconds": 96,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Cherry Soda",
+     "duration_seconds": 175,
+     "artists": []
+    },
+    {
+     "position": "A5",
+     "title": "Wild Wheels",
+     "duration_seconds": 191,
+     "artists": []
+    },
+    {
+     "position": "A6",
+     "title": "Go Go Ruby",
+     "duration_seconds": 133,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Spark Plug",
+     "duration_seconds": 135,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Shake the Floor",
+     "duration_seconds": 92,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Jukebox Johnny",
+     "duration_seconds": 93,
+     "artists": []
+    },
+    {
+     "position": "B4",
+     "title": "Hot Rod Heart",
+     "duration_seconds": 120,
+     "artists": []
+    },
+    {
+     "position": "B5",
+     "title": "Midnight Diner",
+     "duration_seconds": 111,
+     "artists": []
+    },
+    {
+     "position": "B6",
+     "title": "One More Spin",
+     "duration_seconds": 173,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Ruby Lane",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Buddy Cole",
+     "role": "Guitar",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1020,
+   "title": "Petites Heures",
+   "artists": [
+    "Élise Sorel"
+   ],
+   "artist_ids": [
+    50022
+   ],
+   "year": 1971,
+   "original_year": 1971,
+   "label": "Disques Lumen",
+   "country": "France",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Pop"
+   ],
+   "styles": [
+    "Chanson"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Petites Heures",
+     "duration_seconds": 147,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Le Café Vide",
+     "duration_seconds": 125,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Dimanche Gris",
+     "duration_seconds": 275,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Mon Ami Lointain",
+     "duration_seconds": 207,
+     "artists": []
+    },
+    {
+     "position": "A5",
+     "title": "La Pluie à Paris",
+     "duration_seconds": 145,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "L'Hiver Revient",
+     "duration_seconds": 209,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Lettre Perdue",
+     "duration_seconds": 126,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Rue des Saules",
+     "duration_seconds": 207,
+     "artists": []
+    },
+    {
+     "position": "B4",
+     "title": "Valse d'Adieu",
+     "duration_seconds": 279,
+     "artists": []
+    },
+    {
+     "position": "B5",
+     "title": "Demain Peut-Être",
+     "duration_seconds": 261,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Élise Sorel",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Henri Vasseur",
+     "role": "Arranged By",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1021,
+   "title": "Cathedral Sessions",
+   "artists": [
+    "Granite Choir"
+   ],
+   "artist_ids": [
+    50004
+   ],
+   "year": 1988,
+   "original_year": 1988,
+   "label": "Saltmarsh",
+   "country": "UK",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Classical"
+   ],
+   "styles": [
+    "Choral"
+   ],
+   "notes": "Recorded at night in an empty cathedral to use its eight-second echo.",
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Kyrie",
+     "duration_seconds": 534,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Gloria",
+     "duration_seconds": 374,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Evening Hymn",
+     "duration_seconds": 413,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Psalm of Stones",
+     "duration_seconds": 339,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Nunc Dimittis",
+     "duration_seconds": 562,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Lux Aeterna",
+     "duration_seconds": 474,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Vesper",
+     "duration_seconds": 565,
+     "artists": []
+    },
+    {
+     "position": "B4",
+     "title": "Amen",
+     "duration_seconds": 399,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Helen Ashdown",
+     "role": "Conductor",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1022,
+   "title": "Short Fuse EP",
+   "artists": [
+    "Voltage Kids"
+   ],
+   "artist_ids": [
+    50020
+   ],
+   "year": 2012,
+   "original_year": 2012,
+   "label": "Gridlock",
+   "country": "US",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Rock"
+   ],
+   "styles": [
+    "Punk"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Short Fuse",
+     "duration_seconds": 119,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Blackout",
+     "duration_seconds": 191,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "No Sleep",
+     "duration_seconds": 213,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Fire Drill",
+     "duration_seconds": 197,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Tess Riot",
+     "role": "Vocals",
+     "tracks": ""
+    },
+    {
+     "name": "Jonny Mayhem",
+     "role": "Drums",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1023,
+   "title": "Morning Standards",
+   "artists": [
+    "Theo Marsh Trio"
+   ],
+   "artist_ids": [
+    50019
+   ],
+   "year": 1965,
+   "original_year": 1965,
+   "label": "Bluefield",
+   "country": "US",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Jazz"
+   ],
+   "styles": [
+    "Cool Jazz"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Early Light",
+     "duration_seconds": 434,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Coffee and Rain",
+     "duration_seconds": 437,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Blue Morning",
+     "duration_seconds": 415,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Slow Walk",
+     "duration_seconds": 272,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Sunday Standard",
+     "duration_seconds": 353,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Easy Street",
+     "duration_seconds": 308,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "Theo Marsh",
+     "role": "Piano",
+     "tracks": ""
+    },
+    {
+     "name": "Ike Fenwick",
+     "role": "Bass",
+     "tracks": ""
+    },
+    {
+     "name": "Carla Wynn",
+     "role": "Drums",
+     "tracks": ""
+    }
+   ]
+  },
+  {
+   "id": 1024,
+   "title": "Rooftop Party Mix",
+   "artists": [
+    "Lumen Sound System"
+   ],
+   "artist_ids": [
+    50010
+   ],
+   "year": 1999,
+   "original_year": 1999,
+   "label": "Velvet Dial",
+   "country": "UK",
+   "format": "Vinyl, LP",
+   "genres": [
+    "Electronic"
+   ],
+   "styles": [
+    "House"
+   ],
+   "notes": null,
+   "cover_url": null,
+   "tracks": [
+    {
+     "position": "A1",
+     "title": "Rooftop Intro",
+     "duration_seconds": 379,
+     "artists": []
+    },
+    {
+     "position": "A2",
+     "title": "Sunset Jack",
+     "duration_seconds": 378,
+     "artists": []
+    },
+    {
+     "position": "A3",
+     "title": "Hands Up High",
+     "duration_seconds": 500,
+     "artists": []
+    },
+    {
+     "position": "A4",
+     "title": "Concrete Garden",
+     "duration_seconds": 491,
+     "artists": []
+    },
+    {
+     "position": "B1",
+     "title": "Midnight Pool",
+     "duration_seconds": 701,
+     "artists": []
+    },
+    {
+     "position": "B2",
+     "title": "Disco Lights Forever",
+     "duration_seconds": 829,
+     "artists": []
+    },
+    {
+     "position": "B3",
+     "title": "Sunrise Bassline",
+     "duration_seconds": 582,
+     "artists": []
+    },
+    {
+     "position": "B4",
+     "title": "Last Dance",
+     "duration_seconds": 820,
+     "artists": []
+    }
+   ],
+   "credits": [
+    {
+     "name": "DJ Lumen",
+     "role": "DJ Mix",
+     "tracks": ""
+    }
+   ]
+  }
+ ],
+ "artists": [
+  {
+   "id": 50005,
+   "name": "Hexagon Pulse",
+   "members": [],
+   "profile": "The techno project of a producer from Düsseldorf who built his own drum machines.",
+   "urls": []
+  },
+  {
+   "id": 50008,
+   "name": "Kalimba Collective",
+   "members": [],
+   "profile": "A twelve-piece band from Accra that mixed highlife horns with American funk.",
+   "urls": []
+  },
+  {
+   "id": 50011,
+   "name": "Marisol Vega",
+   "members": [],
+   "profile": "A bolero singer from Cádiz whose songs are about the sea and the people waiting for it.",
+   "urls": []
+  },
+  {
+   "id": 50018,
+   "name": "The Low Lanterns",
+   "members": [],
+   "profile": "A folk-rock band from a fishing town on the north coast, known for harmonies and songs about the sea.",
+   "urls": []
+  },
+  {
+   "id": 50019,
+   "name": "Theo Marsh Trio",
+   "members": [],
+   "profile": "A piano trio led by Theo Marsh that played the small clubs of the city for twenty years.",
+   "urls": []
+  }
+ ],
+ "items": [
+  {
+   "release_id": 1001,
+   "owned": true,
+   "date_added": "2020-01-10T00:00:00+00:00"
+  },
+  {
+   "release_id": 1002,
+   "owned": true,
+   "date_added": "2020-02-16T00:00:00+00:00"
+  },
+  {
+   "release_id": 1003,
+   "owned": true,
+   "date_added": "2020-03-24T00:00:00+00:00"
+  },
+  {
+   "release_id": 1004,
+   "owned": true,
+   "date_added": "2020-04-30T00:00:00+00:00"
+  },
+  {
+   "release_id": 1005,
+   "owned": true,
+   "date_added": "2020-06-06T00:00:00+00:00"
+  },
+  {
+   "release_id": 1006,
+   "owned": true,
+   "date_added": "2020-07-13T00:00:00+00:00"
+  },
+  {
+   "release_id": 1007,
+   "owned": true,
+   "date_added": "2020-08-19T00:00:00+00:00"
+  },
+  {
+   "release_id": 1008,
+   "owned": true,
+   "date_added": "2020-09-25T00:00:00+00:00"
+  },
+  {
+   "release_id": 1009,
+   "owned": true,
+   "date_added": "2020-11-01T00:00:00+00:00"
+  },
+  {
+   "release_id": 1010,
+   "owned": true,
+   "date_added": "2020-12-08T00:00:00+00:00"
+  },
+  {
+   "release_id": 1011,
+   "owned": true,
+   "date_added": "2021-01-14T00:00:00+00:00"
+  },
+  {
+   "release_id": 1012,
+   "owned": true,
+   "date_added": "2021-02-20T00:00:00+00:00"
+  },
+  {
+   "release_id": 1013,
+   "owned": true,
+   "date_added": "2021-03-29T00:00:00+00:00"
+  },
+  {
+   "release_id": 1014,
+   "owned": true,
+   "date_added": "2021-05-05T00:00:00+00:00"
+  },
+  {
+   "release_id": 1015,
+   "owned": true,
+   "date_added": "2021-06-11T00:00:00+00:00"
+  },
+  {
+   "release_id": 1016,
+   "owned": true,
+   "date_added": "2021-07-18T00:00:00+00:00"
+  },
+  {
+   "release_id": 1017,
+   "owned": true,
+   "date_added": "2021-08-24T00:00:00+00:00"
+  },
+  {
+   "release_id": 1018,
+   "owned": true,
+   "date_added": "2021-09-30T00:00:00+00:00"
+  },
+  {
+   "release_id": 1019,
+   "owned": true,
+   "date_added": "2021-11-06T00:00:00+00:00"
+  },
+  {
+   "release_id": 1020,
+   "owned": true,
+   "date_added": "2021-12-13T00:00:00+00:00"
+  },
+  {
+   "release_id": 1021,
+   "owned": true,
+   "date_added": "2022-01-19T00:00:00+00:00"
+  },
+  {
+   "release_id": 1022,
+   "owned": true,
+   "date_added": "2022-02-25T00:00:00+00:00"
+  },
+  {
+   "release_id": 1023,
+   "owned": true,
+   "date_added": "2022-04-03T00:00:00+00:00"
+  },
+  {
+   "release_id": 1024,
+   "owned": true,
+   "date_added": "2022-05-10T00:00:00+00:00"
+  }
+ ]
+}

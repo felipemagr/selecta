@@ -47,6 +47,7 @@ def _ids(
     rejected: list[int] = [],  # noqa: B006
     remembered: list[int] = [],  # noqa: B006
     whole_album: bool = False,
+    playable: bool = True,
 ) -> list[int]:
     session = Session(
         id="s",
@@ -63,7 +64,8 @@ def _ids(
         ),
         rejections=[Rejection(release_id=i, reason="no") for i in rejected],
     )
-    return [r.id for r in find_candidates(Shelf(*releases), session).releases]  # type: ignore[arg-type]
+    shelf = Shelf(*releases)
+    return [r.id for r in find_candidates(shelf, session, playable).releases]  # type: ignore[arg-type]
 
 
 def test_candidates_match_mood_and_energy() -> None:
@@ -106,6 +108,18 @@ def test_whole_album_leaves_out_records_known_to_run_past_the_time() -> None:
 
 def test_only_records_on_the_music_server_are_candidates() -> None:
     assert sorted(_ids(_record(1), _record(2, playable=0), _record(3, playable=1))) == [1, 3]
+
+
+def test_without_a_music_server_every_owned_record_is_a_candidate() -> None:
+    assert sorted(_ids(_record(1), _record(2, playable=0), playable=False)) == [1, 2]
+
+
+def test_without_a_music_server_candidates_say_nothing_about_playing() -> None:
+    session = Session(id="s", started_at=NOW)
+    records = [_record(1, playable=0)]
+    candidates = Candidates(releases=records, filters={}, relaxed=[], playable=False)
+
+    assert "can be played" not in describe(candidates, session)
 
 
 def test_partly_downloaded_record_says_how_much_can_play() -> None:

@@ -24,10 +24,13 @@ class Candidates(BaseModel):
     releases: list[ReleaseSummary]
     filters: dict[str, str]
     relaxed: list[str]
+    playable: bool = True
 
 
-def find_candidates(store: CollectionStore, session: Session) -> Candidates:
-    """Return owned records on the music server matching the brief, minus this session's rejections.
+def find_candidates(store: CollectionStore, session: Session, playable: bool = True) -> Candidates:
+    """Return owned records matching the brief, minus this session's rejections.
+
+    With `playable`, only records on the music server are offered.
 
     If the listener wants whole albums, records known to run past their time are left out.
     With too few matches, energy then mood are relaxed; stricter matches stay first. Each step is
@@ -50,7 +53,7 @@ def find_candidates(store: CollectionStore, session: Session) -> Candidates:
         minutes = brief.listening_minutes() if brief.wants_whole_album() else None
         found = [
             r
-            for r in store.owned_summaries(**filters, playable=True)
+            for r in store.owned_summaries(**filters, playable=playable)
             if r.id not in taken and not runs_past(r.duration_seconds, minutes)
         ]
         random.Random(session.id).shuffle(found)
@@ -58,7 +61,8 @@ def find_candidates(store: CollectionStore, session: Session) -> Candidates:
         releases += rank(found, remembered)[: MAX_CANDIDATES - len(releases)]
         if len(releases) >= MIN_CANDIDATES:
             break
-    return Candidates(releases=releases, filters=used, relaxed=[s for s in wanted if s not in used])
+    relaxed = [s for s in wanted if s not in used]
+    return Candidates(releases=releases, filters=used, relaxed=relaxed, playable=playable)
 
 
 def describe(candidates: Candidates, session: Session) -> str:
@@ -78,7 +82,7 @@ def describe(candidates: Candidates, session: Session) -> str:
         feel = f"{r.mood}/{r.energy or 'energy not tagged'}" if r.mood else "mood not tagged"
         long = runs_past(r.duration_seconds, minutes, MUCH_LONGER_FACTOR)
         notes = [MUCH_LONGER_NOTE] if long else []
-        if r.playable_count < r.track_count:
+        if candidates.playable and r.playable_count < r.track_count:
             notes.append(f"Only {r.playable_count} of its {r.track_count} tracks can be played.")
         if recalled := memory.get(r.id):
             notes.append(note(recalled))
