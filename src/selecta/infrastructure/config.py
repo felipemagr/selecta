@@ -76,3 +76,5 @@ class VOICE:
 class SERVER:
     HOST = os.environ.get("SELECTA_HOST", "127.0.0.1")
     PORT = int(os.environ.get("SELECTA_PORT", "8000"))
+    SESSION_IDLE_MINUTES = 60
+    COVER_TIMEOUT_SECONDS = 10

@@ -133,7 +133,23 @@ def _serve(_: argparse.Namespace) -> None:
                 raise NavidromeError(f"{song_id} isn't one of the collection's songs")
             return await navidrome.open_stream(music, song_id, byte_range)
 
-        app = create_app(open_session, open_song if config.NAVIDROME.URL else None)
+        covers = httpx.AsyncClient(timeout=config.SERVER.COVER_TIMEOUT_SECONDS)
+
+        async def open_cover(release_id: int) -> httpx.Response | None:
+            release = await asyncio.to_thread(store.get_release, release_id)
+            if release is None or not (release.cover_url or "").startswith("https://"):
+                return None
+            try:
+                request = covers.build_request("GET", release.cover_url)
+                response = await covers.send(request, stream=True)
+            except httpx.HTTPError:
+                return None
+            if response.is_success:
+                return response
+            await response.aclose()
+            return None
+
+        app = create_app(open_session, open_song if config.NAVIDROME.URL else None, open_cover)
         uvicorn.run(app, host=config.SERVER.HOST, port=config.SERVER.PORT)
 
 

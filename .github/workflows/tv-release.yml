@@ -1,0 +1,42 @@
+name: tv-release
+
+# Pushing a tag like tv-v1.0.0 publishes the TV app's signed APK as a GitHub release.
+on:
+  push:
+    tags: ["tv-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          gradle-version: "8.11.1"
+      - name: Build the signed APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.TV_KEYSTORE_BASE64 }}
+          SIGNING_PASSWORD: ${{ secrets.TV_SIGNING_PASSWORD }}
+          VERSION_NAME: ${{ github.ref_name }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          export SIGNING_KEYSTORE="$RUNNER_TEMP/selecta.jks"
+          echo "$KEYSTORE_BASE64" | base64 -d > "$SIGNING_KEYSTORE"
+          gradle -p android assembleRelease
+          mv android/app/build/outputs/apk/release/app-release.apk "selecta-tv-${VERSION_NAME#tv-}.apk"
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" selecta-tv-*.apk --repo "$GITHUB_REPOSITORY" --title "Selecta TV ${TAG#tv-}" --generate-notes

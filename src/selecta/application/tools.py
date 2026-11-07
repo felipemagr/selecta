@@ -27,6 +27,7 @@ from selecta.application.ports import (
 )
 from selecta.application.retrieval import semantic_search
 from selecta.domain.brief import OPTIONAL_SLOTS, SLOT_ORDER, Answer, Brief, Occasion
+from selecta.domain.collection import Release
 from selecta.domain.enrichment import Energy, Mood
 from selecta.domain.library import PlayableTrack
 from selecta.domain.picking import MUCH_LONGER_FACTOR, runs_past
@@ -199,7 +200,7 @@ SPECS = [
     ),
 ]
 
-Play = Callable[[list[PlayableTrack]], PlaybackResult]
+Play = Callable[[Release, list[PlayableTrack]], PlaybackResult]
 
 
 class Tools:
@@ -272,7 +273,8 @@ class Tools:
 
     def _play(self, session: Session, release_id: int, play: Play, track: str | None = None) -> str:
         """Play the record from the given track, picking it first if it isn't the current pick."""
-        if self._store.owned_summary(release_id) is None:
+        release = self._store.get_release(release_id)
+        if release is None or self._store.owned_summary(release_id) is None:
             return "That isn't one of the listener's records. Find it with search_collection."
         tracks = self._store.playable(release_id)
         if not tracks:
@@ -287,7 +289,7 @@ class Tools:
             picked = self._pick(session, release_id, "They asked to hear it.", asked_by_name=True)
             if session.pick is None or session.pick.release_id != release_id:
                 return picked
-        match play(tracks):
+        match play(release, tracks):
             case "playing":
                 return f"{picked} Playing: {len(tracks)} tracks, from {tracks[0].title}.".strip()
             case "cancelled":

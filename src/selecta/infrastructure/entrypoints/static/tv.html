@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Selecta</title>
+<link rel="icon" href="/static/icon.svg">
+<style>
+  @font-face { font-family: Doto; font-weight: 100 900; font-display: block;
+               src: url(/static/fonts/doto.woff2) format("woff2"); }
+  @font-face { font-family: "Host Grotesk"; font-weight: 300 800; font-display: block;
+               src: url(/static/fonts/host-grotesk.woff2) format("woff2"); }
+  @font-face { font-family: "Geist Mono"; font-weight: 100 900; font-display: block;
+               src: url(/static/fonts/geist-mono.woff2) format("woff2"); }
+  :root {
+    --black: #000; --white: #fff; --grey: rgb(255 255 255 / 0.56); --faint: rgb(255 255 255 / 0.24);
+    --red: #d71921;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --dots: Doto, monospace; --sans: "Host Grotesk", system-ui, sans-serif; --mono: "Geist Mono", monospace;
+    --edge: 5vh;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; overflow: hidden; background: var(--black); color: var(--white); }
+  body { font-family: var(--sans); -webkit-font-smoothing: antialiased; cursor: none;
+         user-select: none; -webkit-user-select: none; }
+  .layer { position: fixed; inset: 0; transition: opacity 600ms var(--ease-out); }
+  .tag { font: 400 1.45vh/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--grey); }
+
+  /* Corners: the name, and what Selecta is doing right now. */
+  #name { position: fixed; top: var(--edge); left: var(--edge); }
+  #status { position: fixed; top: var(--edge); right: var(--edge); display: flex; align-items: center; gap: 1vh; }
+  #status:empty { display: none; }
+  #status.live::before { content: ""; width: 1vh; height: 1vh; border-radius: 50%; background: var(--red);
+                         animation: blink 1.2s steps(2, jump-none) infinite; }
+  @keyframes blink { 50% { opacity: 0.25; } }
+
+  /* Idle: the clock. */
+  #idle { display: grid; place-items: center; }
+  #clock { font: 800 26vh/1 var(--dots); font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
+           font-variation-settings: "ROND" 100; transition: transform 2s var(--ease-in-out); }
+
+  /* The record. */
+  #record { opacity: 0; display: grid; grid-template-columns: 62vh 1fr; gap: 8vh; align-items: center;
+            padding: 0 calc(var(--edge) * 2); }
+  body.playing #record { opacity: 1; }
+  body.playing #idle { opacity: 0; }
+  #halftone { width: 62vh; height: 62vh; clip-path: circle(0% at 50% 50%);
+              transition: clip-path 1.4s var(--ease-out); }
+  #halftone.shown { clip-path: circle(75% at 50% 50%); }
+  #where { margin-bottom: 3vh; }
+  #title { font: 800 8.4vh/1.02 var(--dots); text-wrap: balance; letter-spacing: 0.01em;
+          font-variation-settings: "ROND" 100; }
+  #artist { font: 400 3.4vh/1.2 var(--sans); margin-top: 2.4vh; }
+  #meta { margin-top: 1.6vh; }
+  #tracks { margin-top: 5.5vh; height: 21vh; overflow: hidden;
+            -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+  #tracklist { transition: transform 700ms var(--ease-in-out); padding: 0; list-style: none; }
+  #tracklist li { display: grid; grid-template-columns: 2.4vh 6vh 1fr auto; align-items: center; height: 4.2vh;
+                  font: 400 2.2vh/1 var(--sans); color: var(--faint); transition: color 400ms ease; }
+  #tracklist li::before { content: ""; }
+  #tracklist li.now { color: var(--white); }
+  #tracklist li.now::before { width: 0.9vh; height: 0.9vh; border-radius: 50%; background: var(--red); }
+  #tracklist .pos, #tracklist .len { font: 400 1.7vh/1 var(--mono); letter-spacing: 0.08em; font-variant-numeric: tabular-nums; }
+  #time { display: flex; align-items: center; gap: 2vh; margin-top: 3vh; }
+  #bar { flex: 1; height: 1.2vh; min-width: 0; }
+
+  /* The conversation, over everything. */
+  #talk { opacity: 0; }
+  body.talking #talk { opacity: 1; }
+  body.talking:not(.playing) #idle, body.talking.playing #record { opacity: 0.05; }
+  #glyph { position: absolute; left: 50%; top: 50%; width: 52vh; height: 52vh; margin: -26vh 0 0 -26vh;
+           transition: transform 900ms var(--ease-in-out); }
+  body[data-talk="speaking"] #glyph { transform: translate(calc(20vh - 50vw), -28vh) scale(0.38); }
+  #words { position: absolute; left: calc(var(--edge) * 2); right: calc(var(--edge) * 2); bottom: 13vh; }
+  #you { font: 400 2.8vh/1.35 var(--sans); color: var(--grey); max-width: 60vw; margin-bottom: 3.6vh;
+         transition: opacity 400ms var(--ease-out); }
+  #you:empty { opacity: 0; }
+  #lines { display: flex; flex-direction: column; gap: 2vh; max-width: 72vw; }
+  .line { font: 400 5.4vh/1.18 var(--sans); letter-spacing: -0.012em; text-wrap: pretty;
+          transition: opacity 500ms ease; }
+  .line.past { opacity: 0.3; }
+  .line.problem { color: var(--red); }
+  .w { opacity: 0; filter: blur(0.4vh); transition: opacity 260ms var(--ease-out), filter 260ms var(--ease-out); }
+  .w.on { opacity: 1; filter: none; }
+
+  #note { position: fixed; right: var(--edge); bottom: var(--edge); }
+  #note:empty { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #glyph, #tracklist, #clock, #halftone { transition: none; }
+    .w { filter: none; }
+  }
+</style>
+</head>
+<body data-talk="off">
+<div class="tag" id="name">Selecta</div>
+<div class="tag" id="status"></div>
+<section class="layer" id="idle"><time id="clock"></time></section>
+<section class="layer" id="record">
+  <canvas id="halftone" width="1200" height="1200" role="img" aria-label="Cover"></canvas>
+  <div>
+    <div class="tag" id="where"></div>
+    <h1 id="title"></h1>
+    <div id="artist"></div>
+    <div class="tag" id="meta"></div>
+    <div id="tracks"><ol id="tracklist"></ol></div>
+    <div id="time"><span class="tag" id="elapsed">0:00</span><canvas id="bar"></canvas><span class="tag" id="total"></span></div>
+  </div>
+</section>
+<section class="layer" id="talk">
+  <canvas id="glyph"></canvas>
+  <div id="words"><p id="you"></p><div id="lines"></div></div>
+</section>
+<div class="tag" id="note"></div>
+<script type="module">
+import { Glyph } from "/static/glyph.js";
+
+const SPEECH_RATE = 24000, LINGER_SECONDS = 7, MAX_LINES = 3, DUCKED = 0.15;
+const $ = id => document.getElementById(id);
+const ctx = new AudioContext();
+const voice = ctx.createAnalyser();
+voice.fftSize = 512; voice.connect(ctx.destination);
+const glyph = new Glyph($("glyph"));
+let ws, turn = 0, turnDone = true, lines = [], sources = [], nextStart = 0, reported = 0;
+
+// The clock, nudged a little every minute so a TV left on doesn't mark its screen.
+function tick() {
+  const parts = new Intl.DateTimeFormat([], { hour: "numeric", minute: "2-digit" }).formatToParts(new Date());
+  $("clock").textContent = parts.filter(p => p.type !== "dayPeriod").map(p => p.value).join("").trim();
+}
+tick(); setInterval(tick, 1000);
+setInterval(() => {
+  $("clock").style.transform = `translate(${(Math.random() - 0.5) * 3}vw, ${(Math.random() - 0.5) * 3}vh)`;
+}, 60000);
+
+function connect() {
+  ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/screen`);
+  ws.binaryType = "arraybuffer";
+  const lost = setTimeout(() => { $("note").textContent = "Offline"; }, 3000);
+  ws.onopen = () => { clearTimeout(lost); $("note").textContent = ""; audioHint(); };
+  ws.onclose = () => { clearTimeout(lost); setTimeout(connect, 2000); };
+  ws.onmessage = ({ data }) => data instanceof ArrayBuffer ? speak(new Float32Array(data)) : on(JSON.parse(data));
+}
+
+function send(message) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); }
+
+function audioHint() { if (ctx.state === "suspended") $("note").textContent = "Press OK for sound"; }
+const unlock = () => ctx.resume().then(() => { if (ctx.state === "running") $("note").textContent = ""; });
+addEventListener("keydown", unlock); addEventListener("click", unlock);
+
+function on(event) {
+  switch (event.type) {
+    case "started": turn = event.turn; startTurn(); break;
+    case "level": glyph.level(event.value); break;
+    case "transcript": $("you").textContent = event.text; setTalk("thinking"); break;
+    case "line": lines.push({ text: event.text, start: null, end: null, el: null }); break;
+    case "problem": lines.push({ text: event.text, start: null, end: null, el: null, problem: true }); break;
+    case "done": turnDone = true; break;
+    case "play": play(event.record, event.tracks); break;
+    case "stop_music": stopMusic(); break;
+  }
+}
+
+function startTurn() {
+  sources.forEach(s => { try { s.stop(); } catch (_) {} });
+  sources = []; nextStart = 0; lines = []; turnDone = false; reported = 0;
+  $("lines").replaceChildren(); $("you").textContent = "";
+  glyph.level(0);
+  setTalk("listening");
+}
+
+const STATUS = { listening: "Listening", thinking: "Thinking", speaking: "Speaking", off: "" };
+function setTalk(state) {
+  document.body.dataset.talk = state;
+  document.body.classList.toggle("talking", state !== "off");
+  $("status").textContent = STATUS[state];
+  $("status").classList.toggle("live", state === "listening");
+  glyph.set(state === "off" ? "idle" : state);
+  awake();
+}
+
+// The agent's voice: each chunk is queued after the last, and belongs to the newest line.
+function speak(samples) {
+  const line = lines[lines.length - 1];
+  if (!line) return;
+  const buffer = ctx.createBuffer(1, samples.length, SPEECH_RATE);
+  buffer.copyToChannel(samples, 0);
+  const source = ctx.createBufferSource();
+  source.buffer = buffer; source.connect(voice);
+  const start = Math.max(nextStart, ctx.currentTime + 0.05);
+  source.start(start); sources.push(source);
+  if (line.start === null) line.start = start;
+  nextStart = line.end = start + buffer.duration;
+}
+
+// Each line shows when its voice starts, word by word at the pace it is spoken.
+function show(line) {
+  const el = document.createElement("p");
+  el.className = line.problem ? "line problem" : "line";
+  const words = line.text.split(/\s+/);
+  const seconds = line.end !== null ? line.end - line.start : words.length * 0.12;
+  const step = Math.min(0.32, seconds / words.length) * 1000;
+  words.forEach((word, i) => {
+    const span = document.createElement("span");
+    span.className = "w"; span.textContent = word;
+    el.append(span, " ");
+    setTimeout(() => span.classList.add("on"), i * step);
+  });
+  flip(() => {
+    const shown = [...$("lines").children];
+    shown.forEach(p => p.classList.add("past"));
+    shown.slice(0, Math.max(0, shown.length - MAX_LINES + 1)).forEach(p => p.remove());
+    $("lines").append(el);
+  });
+  line.el = el;
+  setTalk("speaking");
+}
+
+// Lines move up smoothly when a new one pushes them.
+function flip(change) {
+  const before = new Map([...$("lines").children].map(p => [p, p.getBoundingClientRect().top]));
+  change();
+  for (const [p, top] of before) {
+    if (!p.isConnected) continue;
+    const dy = top - p.getBoundingClientRect().top;
+    if (dy) p.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }],
+                      { duration: 500, easing: "cubic-bezier(0.23, 1, 0.32, 1)" });
+  }
+}
+
+const wave = new Float32Array(voice.fftSize);
+setInterval(() => {
+  const now = ctx.currentTime;
+  lines.forEach((line, i) => {
+    if (line.el) return;
+    const before = lines[i - 1];
+    const ready = before === undefined || (before.el && (before.end === null || before.end <= now));
+    const voiced = line.start !== null && line.start <= now + 0.05;
+    const silent = line.start === null && (turnDone || lines[i + 1]) && ready;
+    if (voiced || silent) show(line);
+  });
+  const heard = lines.filter(l => l.end !== null && l.end <= now).length;
+  if (heard !== reported) { reported = heard; send({ type: "heard", lines: heard, turn }); }
+  const speaking = nextStart > now;
+  if (document.body.dataset.talk === "speaking") {
+    voice.getFloatTimeDomainData(wave);
+    glyph.level(Math.sqrt(wave.reduce((sum, x) => sum + x * x, 0) / wave.length) * 5);
+  }
+  const last = Math.max(nextStart, ...lines.map(l => l.el ? 0 : Infinity));
+  if (turnDone && document.body.dataset.talk !== "off" && now > last + LINGER_SECONDS) setTalk("off");
+  duck(["listening", "thinking"].includes(document.body.dataset.talk) || speaking);
+  progress();
+}, 50);
+
+// The record.
+const music = new Audio();
+let queue = [], index = 0, record = 0, told = false;
+
+function play(info, tracks) {
+  record += 1; queue = tracks; index = 0; told = false;
+  $("title").textContent = info.title;
+  $("artist").textContent = info.artists.join(", ");
+  $("meta").textContent = [info.year, info.label].filter(Boolean).join("  ·  ");
+  $("tracklist").replaceChildren(...tracks.map(t => {
+    const li = document.createElement("li");
+    li.innerHTML = "<span class=pos></span><span class=name></span><span class=len></span>";
+    li.querySelector(".pos").textContent = t.position;
+    li.querySelector(".name").textContent = t.title;
+    li.querySelector(".len").textContent = t.seconds ? clock(t.seconds) : "";
+    return li;
+  }));
+  halftone(info.cover);
+  start();
+}
+
+function start() {
+  const track = queue[index], mine = record;
+  if (!track) return stopMusic();
+  [...$("tracklist").children].forEach((li, i) => li.classList.toggle("now", i === index));
+  $("tracklist").style.transform = `translateY(${-Math.max(0, index - 1) * 4.2}vh)`;
+  $("where").textContent = `${track.position}  ·  ${index + 1} / ${queue.length}`;
+  music.src = track.url;
+  music.play().catch(() => { if (mine === record) report("play_failed"); });
+  document.body.classList.add("playing"); awake();
+}
+
+function report(type) {
+  if (told) return;
+  told = true; send({ type });
+  // A record that can't start shouldn't stay on screen or keep the TV awake.
+  if (type === "play_failed") stopMusic();
+}
+
+function stopMusic() {
+  queue = []; music.pause(); music.removeAttribute("src");
+  document.body.classList.remove("playing"); $("halftone").classList.remove("shown"); awake();
+}
+
+music.addEventListener("playing", () => report("play_started"));
+music.addEventListener("ended", () => { index += 1; start(); });
+music.addEventListener("error", () => {
+  if (!music.getAttribute("src")) return;
+  if (told) { index += 1; start(); } else report("play_failed");
+});
+
+// Progress as a row of dots: played ones white, the playhead red.
+function progress() {
+  const bar = $("bar"), width = bar.clientWidth * 2, height = bar.clientHeight * 2;
+  if (!width || !document.body.classList.contains("playing")) return;
+  if (bar.width !== width) { bar.width = width; bar.height = height; }
+  const g = bar.getContext("2d"), r = height / 2, count = Math.floor(width / (r * 3));
+  const share = music.duration ? music.currentTime / music.duration : 0, head = Math.floor(share * count);
+  g.clearRect(0, 0, width, height);
+  for (let i = 0; i < count; i++) {
+    g.fillStyle = i === head ? "#d71921" : i < head ? "#fff" : "rgb(255 255 255 / 0.22)";
+    g.beginPath(); g.arc(r + i * r * 3, r, i === head ? r : r * 0.62, 0, Math.PI * 2); g.fill();
+  }
+  $("elapsed").textContent = clock(Math.floor(music.currentTime || 0));
+  $("total").textContent = music.duration ? clock(Math.floor(music.duration)) : "";
+}
+
+// The music steps back while the listener talks and the agent speaks.
+function duck(down) {
+  const target = down ? DUCKED : 1;
+  music.volume += (target - music.volume) * 0.25;
+}
+
+// The cover as white dots on black: each dot's size is its patch's brightness.
+function halftone(url) {
+  const canvas = $("halftone"), g = canvas.getContext("2d"), size = canvas.width, cells = 64;
+  const draw = light => {
+    g.clearRect(0, 0, size, size);
+    g.fillStyle = "#fff";
+    const cell = size / cells;
+    for (let y = 0; y < cells; y++) for (let x = 0; x < cells; x++) {
+      const r = (cell / 2) * Math.sqrt(light(x / (cells - 1), y / (cells - 1)));
+      if (r < 0.4) continue;
+      g.beginPath(); g.arc((x + 0.5) * cell, (y + 0.5) * cell, r, 0, Math.PI * 2); g.fill();
+    }
+    requestAnimationFrame(() => canvas.classList.add("shown"));
+  };
+  // Without a cover, a record's grooves.
+  const grooves = (u, v) => {
+    const d = Math.hypot(u - 0.5, v - 0.5) * 2;
+    return d > 1 ? 0 : d < 0.3 ? 0.85 : 0.25 + 0.2 * Math.cos(d * 60);
+  };
+  canvas.classList.remove("shown");
+  if (!url) return draw(grooves);
+  const img = new Image();
+  img.onload = () => {
+    const sample = document.createElement("canvas");
+    sample.width = sample.height = cells;
+    const s = sample.getContext("2d", { willReadFrequently: true });
+    s.drawImage(img, 0, 0, cells, cells);
+    try {
+      const px = s.getImageData(0, 0, cells, cells).data, light = [];
+      for (let i = 0; i < px.length; i += 4) light.push(0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]);
+      // Stretched to the cover's own darkest and lightest, so a dull cover still has contrast.
+      const low = Math.min(...light), span = Math.max(...light) - low || 1;
+      draw((u, v) => ((light[Math.round(v * (cells - 1)) * cells + Math.round(u * (cells - 1))] - low) / span) ** 1.4);
+    } catch (_) { draw(grooves); }
+  };
+  img.onerror = () => draw(grooves);
+  img.src = url;
+}
+
+function clock(s) { return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+
+// The TV may sleep only when nothing is playing or being said.
+function awake() {
+  const on = document.body.classList.contains("playing") || document.body.dataset.talk !== "off";
+  if (window.SelectaTV) window.SelectaTV.keepAwake(on);
+}
+
+// The remote's media keys.
+addEventListener("keydown", e => {
+  if (!queue.length) return;
+  if (e.key === "MediaPlayPause" || e.key === " ") music.paused ? music.play() : music.pause();
+  else if (e.key === "MediaTrackNext" && index < queue.length - 1) { index += 1; start(); }
+  else if (e.key === "MediaTrackPrevious" && index > 0) { index -= 1; start(); }
+});
+
+connect();
+</script>
+</body>
+</html>

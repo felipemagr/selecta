@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --black: #000; --white: #fff; --grey: rgb(255 255 255 / 0.56); --red: #d71921;
+          --ease-out: cubic-bezier(0.23, 1, 0.32, 1); }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: var(--black); color: var(--white); }
+  body { display: grid; place-content: center; gap: 4vh; padding: 0 12vw;
+         font: 400 2.4vh/1.4 system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  h1 { font: 500 8vh/1 monospace; letter-spacing: 0.2em; }
+  p { color: var(--grey); max-width: 60vw; }
+  form { display: flex; gap: 2vw; }
+  input, button { font: 400 2.2vh/1 monospace; color: inherit; border-radius: 999px;
+                  padding: 2.2vh 3vw; outline: none;
+                  transition: border-color 200ms ease, transform 160ms var(--ease-out); }
+  input { width: 52vw; background: none; border: 1px solid rgb(255 255 255 / 0.3); }
+  input::placeholder { color: rgb(255 255 255 / 0.56); }
+  button { background: var(--white); color: var(--black); border: 1px solid var(--white);
+           letter-spacing: 0.16em; text-transform: uppercase; }
+  input:focus { border-color: var(--white); }
+  button:focus { transform: scale(1.04); }
+  #error { color: var(--red); }
+  #error:empty { display: none; }
+</style>
+</head>
+<body>
+  <h1>SELECTA</h1>
+  <p>The address of your Selecta server, as you open it on your phone.</p>
+  <form id="form">
+    <input id="server" type="url" placeholder="https://selecta.example.ts.net" autocomplete="off" spellcheck="false">
+    <button>Connect</button>
+  </form>
+  <p id="error"></p>
+<script>
+  const params = new URLSearchParams(location.search);
+  const input = document.getElementById("server");
+  input.value = params.get("server") || "";
+  document.getElementById("error").textContent = params.get("error") || "";
+  document.getElementById("form").addEventListener("submit", e => {
+    e.preventDefault();
+    window.SelectaTV.connect(input.value);
+  });
+  input.focus();
+</script>
+</body>
+</html>

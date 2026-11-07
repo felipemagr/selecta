@@ -20,6 +20,7 @@ from selecta.application.voice import (
     Transcript,
     VoiceSession,
 )
+from selecta.domain.collection import Release
 from selecta.domain.library import PlayableTrack
 
 
@@ -133,6 +134,29 @@ def test_cutting_off_before_any_reply_leaves_history_alone() -> None:
     assert voice.session.turns[0].spoken.heard is None
 
 
+def test_a_turn_dropped_before_the_agent_leaves_the_reply_before_it_heard() -> None:
+    voice = _voice(Ears("hi"), "First part. Second part.", "Sure.")
+    _turn(voice)
+
+    async def dropped() -> None:
+        async def endless() -> AsyncIterator[bytes]:
+            await asyncio.Event().wait()
+            yield b""
+
+        async def emit(event: Event) -> None:
+            pass
+
+        task = asyncio.create_task(voice.turn(endless(), emit))
+        await asyncio.sleep(0)
+        task.cancel()
+
+    asyncio.run(dropped())
+    _turn(voice, heard_lines=0)
+
+    replies = [m.content for m in voice.session.messages if m.role == "assistant"]
+    assert replies == ["First part. Second part.", "Sure."]
+
+
 def test_failed_transcription_asks_again_without_calling_the_agent() -> None:
     voice = _voice(Ears(fails=True))
 
@@ -174,19 +198,20 @@ def test_player_answer_is_passed_back_and_silence_means_failed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     voice = _voice(Ears("hi"))
+    record = Release(id=1, title="Album", artists=["Someone"], artist_ids=[])
+    track = PlayableTrack(position="A1", title="T", song_id="s1")
     sent: list[Event] = []
 
     async def emit(event: Event) -> None:
         sent.append(event)
 
     async def scenario() -> tuple[str, str]:
-        track = PlayableTrack(position="A1", title="T", song_id="s1")
-        answered = asyncio.create_task(voice._play([track], emit))
+        answered = asyncio.create_task(voice._play(record, [track], emit))
         await asyncio.sleep(0)
         voice.player_said("playing")
         monkeypatch.setattr(voice_module, "PLAYER_TIMEOUT_SECONDS", 0.01)
-        silent = await voice._play([track], emit)
+        silent = await voice._play(record, [track], emit)
         return await answered, silent
 
     assert asyncio.run(scenario()) == ("playing", "failed")
-    assert sent == [Play(["s1"]), Play(["s1"]), StopMusic()]
+    assert sent == [Play(record, [track]), Play(record, [track]), StopMusic()]

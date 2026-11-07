@@ -16,6 +16,7 @@ from selecta.application.ports import (
     SpeechToText,
     TextToSpeech,
 )
+from selecta.domain.collection import Release
 from selecta.domain.library import PlayableTrack
 
 logger = logging.getLogger(__name__)
@@ -55,9 +56,10 @@ class Problem:
 
 @dataclass
 class Play:
-    """Tracks for the player to play in order, each by its song id."""
+    """A record for the player: its tracks, played in order."""
 
-    song_ids: list[str]
+    release: Release
+    tracks: list[PlayableTrack]
 
 
 @dataclass
@@ -95,6 +97,7 @@ class VoiceSession:
         self._lines: list[str] = []
         self._first_audio_ms: int | None = None
         self._spoken_turn: int | None = None
+        self._spoken_by = 0
         self._player: asyncio.Future[PlaybackResult] | None = None
         self._turns = 0
 
@@ -121,7 +124,7 @@ class VoiceSession:
             text = None
         await self._settle()
         if heard_lines is not None:
-            await self._cut_off(heard_lines)
+            await self._cut_off(heard_lines, this_turn)
         if text is None:
             await emit(Problem("I didn't catch that. Try again?"))
             await emit(Done())
@@ -137,11 +140,11 @@ class VoiceSession:
         def say(line: str) -> None:
             loop.call_soon_threadsafe(queue.put_nowait, line)
 
-        def play(tracks: list[PlayableTrack]) -> PlaybackResult:
+        def play(release: Release, tracks: list[PlayableTrack]) -> PlaybackResult:
             # A turn the listener cut off must not start its record.
             if this_turn != self._turns:
                 return "cancelled"
-            started = asyncio.run_coroutine_threadsafe(self._play(tracks, emit), loop)
+            started = asyncio.run_coroutine_threadsafe(self._play(release, tracks, emit), loop)
             return started.result()
 
         def run() -> str:
@@ -151,7 +154,7 @@ class VoiceSession:
                 loop.call_soon_threadsafe(queue.put_nowait, None)
 
         self._lines, self._first_audio_ms = [], None
-        self._spoken_turn = len(self.session.turns)
+        self._spoken_turn, self._spoken_by = len(self.session.turns), this_turn
         self._job = self._thread.submit(run)
         await self._speak(queue, emit, heard_at)
         await asyncio.wrap_future(self._job)
@@ -161,10 +164,12 @@ class VoiceSession:
         await self._save()
         await emit(Done())
 
-    async def _cut_off(self, heard_lines: int) -> None:
+    async def _cut_off(self, heard_lines: int, cutting: int) -> None:
         """Record that the listener cut off the last reply after `heard_lines` lines."""
         index, self._spoken_turn = self._spoken_turn, None
-        if index is None or index >= len(self.session.turns):
+        # Only the turn right before can be cut off: when that one ended before reaching the
+        # agent, the reply before it was heard whole.
+        if index is None or index >= len(self.session.turns) or self._spoken_by != cutting - 1:
             return
         turn = self.session.turns[index]
         heard = self._lines[:heard_lines]
@@ -192,11 +197,14 @@ class VoiceSession:
             self._player.set_result(result)
 
     async def _play(
-        self, tracks: list[PlayableTrack], emit: Callable[[Event], Awaitable[None]]
+        self,
+        release: Release,
+        tracks: list[PlayableTrack],
+        emit: Callable[[Event], Awaitable[None]],
     ) -> PlaybackResult:
-        """Send the tracks to the player and wait until it says whether it started."""
+        """Send the record to the player and wait until it says whether it started."""
         self._player = asyncio.get_running_loop().create_future()
-        await emit(Play([t.song_id for t in tracks]))
+        await emit(Play(release, tracks))
         try:
             return await asyncio.wait_for(self._player, PLAYER_TIMEOUT_SECONDS)
         except TimeoutError:
