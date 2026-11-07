@@ -31,10 +31,10 @@ jobs:
           VERSION_NAME: ${{ github.ref_name }}
           VERSION_CODE: ${{ github.run_number }}
         run: |
-          export SIGNING_KEYSTORE="$RUNNER_TEMP/selecta.jks"
+          export SIGNING_KEYSTORE="$RUNNER_TEMP/selecta.jks" VERSION_NAME="${VERSION_NAME#tv-v}"
           echo "$KEYSTORE_BASE64" | base64 -d > "$SIGNING_KEYSTORE"
           gradle -p android assembleRelease
-          mv android/app/build/outputs/apk/release/app-release.apk "selecta-tv-${VERSION_NAME#tv-}.apk"
+          mv android/app/build/outputs/apk/release/app-release.apk "selecta-tv-v$VERSION_NAME.apk"
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
