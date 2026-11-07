@@ -3,6 +3,12 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/felipemagr/selecta/actions/workflows/ci.yml"><img src="https://github.com/felipemagr/selecta/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License: Apache 2.0"></a>
+  <img src="https://img.shields.io/badge/python-3.12-blue" alt="Python 3.12">
+</p>
+
+<p align="center">
   A voice agent that asks what you feel like hearing, picks a record from <b>your own</b>
   collection, and plays it on your TV.
 </p>
@@ -50,9 +56,16 @@ browser.
 - **Traceable.** Every turn stores the context the model saw, its tool calls, the state before
   and after, latency and tokens. Each session ends with a JSON summary.
 
+## Requirements
+
+- [Docker](https://docs.docker.com/get-docker/) with Compose.
+- A [Mistral API key](https://console.mistral.ai) (the agent, speech and indexing).
+- Optional: a [Discogs](https://www.discogs.com) collection, a Subsonic-compatible music
+  server such as [Navidrome](https://www.navidrome.org), and an Android TV.
+
 ## Quickstart
 
-With Docker, a [Mistral API key](https://console.mistral.ai) and the sample collection:
+With the sample collection, so no Discogs or music server is needed:
 
 ```bash
 git clone https://github.com/felipemagr/selecta && cd selecta
