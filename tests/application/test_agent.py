@@ -581,7 +581,7 @@ def _play_turn(
 @pytest.mark.parametrize(
     ("playable", "result", "told"),
     [
-        (2, "playing", "Playing: 2 tracks"),
+        (2, "playing", "Album 1: 2 tracks"),
         (2, "failed", "didn't start"),
         (0, "playing", "only on vinyl"),
     ],
@@ -618,6 +618,28 @@ def test_a_record_the_listener_names_is_picked_mid_interview_and_over_a_pick() -
     agent.reply(session, "let's just put Album 3")
 
     assert session.pick is not None and session.pick.release_id == 3
+
+
+def test_a_pick_whose_title_isnt_the_records_is_refused() -> None:
+    args = {"release_id": 1, "title": "Album 3", "reason": "x"}
+    pick = Reply(tool_calls=[ToolCall(id="p", name="pick_record", arguments=args)])
+    agent, _ = _agent(ScriptedModel(pick, Reply(text="Hm.")), _record(1), _record(3))
+    session = agent.start()
+    session.brief = _complete_brief()
+
+    agent.reply(session, "go")
+
+    assert session.pick is None
+    assert "1 is Someone - Album 1, not Album 3" in session.turns[0].tool_runs[0].result
+
+
+def test_saying_nothing_after_playing_isnt_a_failure() -> None:
+    call = ToolCall(id="pl", name="play_record", arguments={"release_id": 1})
+    agent, _ = _agent(ScriptedModel(Reply(tool_calls=[call]), Reply(text="")), _record(1))
+
+    reply = agent.reply(agent.start(), "play Album 1", play=lambda r, t: "playing")  # type: ignore[arg-type]
+
+    assert reply != FALLBACK_REPLIES["en"]
 
 
 def test_playing_a_named_record_picks_it_in_the_same_call() -> None:
@@ -657,8 +679,8 @@ def test_playing_an_unknown_record_asks_to_search_first() -> None:
 @pytest.mark.parametrize(
     ("track", "first", "told"),
     [
-        ("2", "s1", "Playing: 2 tracks"),
-        ("A2", "s2", "Playing: 1 tracks"),
+        ("2", "s1", "Album 1: 2 tracks"),
+        ("A2", "s2", "Album 1: 1 tracks"),
         ("9", None, "no track 9"),
     ],
 )

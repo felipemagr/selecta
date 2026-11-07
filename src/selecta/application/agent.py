@@ -104,10 +104,14 @@ class Agent:
                     message.content = " ".join(stream.spoken)
                     return " ".join(spoken)
                 session.messages.pop()
-                if not spoken:
+                acted = session.pick != turn.pick_before or any(
+                    r.call.name == "play_record" and r.result.startswith("Playing")
+                    for r in turn.tool_runs
+                )
+                if not spoken and not acted:
                     return self._fall_back(session, speak, spoken)
-                # Nothing more to say: what this turn already said becomes its closing message.
-                _close_turn(session, spoken)
+                # Silence needs no apology
+                _close_turn(session, spoken or ["…"])
                 return " ".join(spoken)
 
             def before_search(stream: SentenceStream = stream) -> None:
