@@ -141,19 +141,20 @@ def _session(
         session.pick = Pick(
             release_id=pick, title=release.title, artists=release.artists, reason=WHY[language]
         )
-        args = {"release_id": pick, "reason": WHY[language]}
+        name = f"{', '.join(release.artists)} - {release.title}"
+        args = {"release_id": pick, "title": release.title, "reason": WHY[language]}
         offer = OFFER[language].format(
             title=release.title, artist=release.artists[0], why=WHY[language]
         )
         messages += [
-            *_tool_round("pick1", "pick_record", args, "Picked, not playing yet."),
+            *_tool_round("pick1", "pick_record", args, f"Picked {name}, not playing yet."),
             Message(role="assistant", content=offer),
         ]
     if playing:
         tracks = playable(pick or 0)
         named = [f"{t.position} {t.title}" for t in tracks]
         following = f"; next is {named[1]}" if len(named) > 1 else ""
-        result = f"Playing: {len(tracks)} tracks, from {named[0]}{following}."
+        result = f"Playing {name}: {len(tracks)} tracks, from {named[0]}{following}."
         messages += [
             Message(role="user", content=YES[language]),
             *_tool_round("play1", "play_record", {"release_id": pick}, result),

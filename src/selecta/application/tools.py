@@ -30,7 +30,7 @@ from selecta.application.retrieval import semantic_search
 from selecta.domain.brief import OPTIONAL_SLOTS, SLOT_ORDER, Answer, Brief, Occasion
 from selecta.domain.collection import Release
 from selecta.domain.enrichment import Energy, Mood
-from selecta.domain.library import PlayableTrack
+from selecta.domain.library import PlayableTrack, norm
 from selecta.domain.picking import MUCH_LONGER_FACTOR, runs_past
 
 logger = logging.getLogger(__name__)
@@ -170,13 +170,14 @@ SPECS = [
             "type": "object",
             "properties": {
                 "release_id": {"type": "integer"},
+                "title": {"type": "string", "description": "The record's title, as listed."},
                 "reason": {"type": "string", "description": "Why it suits them, in a sentence."},
                 "asked_by_name": {
                     "type": "boolean",
                     "description": "True if the listener asked for this record themselves.",
                 },
             },
-            "required": ["release_id", "reason"],
+            "required": ["release_id", "title", "reason"],
         },
     ),
     ToolSpec(
@@ -196,18 +197,19 @@ SPECS = [
             "type": "object",
             "properties": {
                 "release_id": {"type": "integer"},
+                "title": {"type": "string", "description": "The record's title, as listed."},
                 "track": {
                     "type": "string",
                     "description": "Where to start: a vinyl position (B1) or a track number (3).",
                 },
             },
-            "required": ["release_id"],
+            "required": ["release_id", "title"],
         },
     ),
 ]
 
 Play = Callable[[Release, list[PlayableTrack]], PlaybackResult]
-PICKED = "Picked, not playing yet."
+NOT_PLAYING = ", not playing yet."
 
 
 class Tools:
@@ -263,12 +265,14 @@ class Tools:
                     return release.model_dump_json() if release else "No such record."
                 case "pick_record":
                     asked = args.get("asked_by_name") is True
-                    return self._pick(session, int(args["release_id"]), args["reason"], asked)
+                    release_id, reason = int(args["release_id"]), args["reason"]
+                    return self._pick(session, release_id, reason, asked, args.get("title"))
                 case "reject_pick":
                     return _reject(session)
                 case "play_record" if play and self._music_server:
                     track = str(args["track"]) if args.get("track") else None
-                    return self._play(session, int(args["release_id"]), play, track)
+                    release_id, title = int(args["release_id"]), args.get("title")
+                    return self._play(session, release_id, play, track, title)
                 case "look_up":
                     release_id, question = int(args["release_id"]), str(args["question"])
                     return self._look_up(release_id, question, before_search)
@@ -283,11 +287,20 @@ class Tools:
             logger.exception("tool %s failed", call.name)
             return f"{call.name} failed. Tell the listener you can't check that right now."
 
-    def _play(self, session: Session, release_id: int, play: Play, track: str | None = None) -> str:
+    def _play(
+        self,
+        session: Session,
+        release_id: int,
+        play: Play,
+        track: str | None = None,
+        title: str | None = None,
+    ) -> str:
         """Play the record from the given track, picking it first if it isn't the current pick."""
         release = self._store.get_release(release_id)
         if release is None or self._store.owned_summary(release_id) is None:
             return "That isn't one of the listener's records. Find it with search_collection."
+        if wrong := _wrong_title(release_id, release.artists, release.title, title):
+            return wrong
         tracks = self._store.playable(release_id)
         if not tracks:
             return "That record isn't on the music server, only on vinyl. Tell the listener."
@@ -301,11 +314,13 @@ class Tools:
             picked = self._pick(session, release_id, "They asked to hear it.", asked_by_name=True)
             if session.pick is None or session.pick.release_id != release_id:
                 return picked
-            notes = picked.removeprefix(PICKED).strip()
+            notes = picked.split(NOT_PLAYING, 1)[-1].strip()
         match play(release, tracks):
             case "playing":
                 following = f"; next is {_track(tracks[1])}" if len(tracks) > 1 else ""
-                playing = f"Playing: {len(tracks)} tracks, from {_track(tracks[0])}{following}."
+                name = _name(release.artists, release.title)
+                first = _track(tracks[0])
+                playing = f"Playing {name}: {len(tracks)} tracks, from {first}{following}."
                 return f"{playing} {notes}".strip()
             case "cancelled":
                 return "The listener spoke over you, so it wasn't started. Listen to them first."
@@ -341,10 +356,19 @@ class Tools:
             f"know.\n{found}"
         )
 
-    def _pick(self, session: Session, release_id: int, reason: str, asked_by_name: bool) -> str:
+    def _pick(
+        self,
+        session: Session,
+        release_id: int,
+        reason: str,
+        asked_by_name: bool,
+        title: str | None = None,
+    ) -> str:
         release = self._store.owned_summary(release_id)
         if release is None:
             return "That record isn't in the listener's collection. Pick another."
+        if wrong := _wrong_title(release_id, release.artists, release.title, title):
+            return wrong
         replaced = session.pick
         if not asked_by_name:
             if session.pick:
@@ -363,9 +387,22 @@ class Tools:
         )
         minutes = session.brief.listening_minutes()
         note = f" It replaces {replaced.title}." if replaced else ""
+        picked = f"Picked {_name(release.artists, release.title)}{NOT_PLAYING}{note}"
         if runs_past(release.duration_seconds, minutes, MUCH_LONGER_FACTOR):
-            return f"{PICKED}{note} {MUCH_LONGER_NOTE}"
-        return f"{PICKED}{note}"
+            return f"{picked} {MUCH_LONGER_NOTE}"
+        return picked
+
+
+def _wrong_title(release_id: int, artists: list[str], title: str, said: str | None) -> str | None:
+    """Return why the id isn't the record the model named, or None if they match."""
+    named, actual = set(norm(said or "").split()), set(norm(title).split())
+    if not named or not actual or named <= actual or actual <= named:
+        return None
+    return f"{release_id} is {_name(artists, title)}, not {said}. Use the right id."
+
+
+def _name(artists: list[str], title: str) -> str:
+    return f"{', '.join(artists)} - {title}"
 
 
 def _track(track: PlayableTrack) -> str:
