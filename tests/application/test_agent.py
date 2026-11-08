@@ -463,7 +463,7 @@ def test_past_sessions_put_remembered_records_after_fresh_ones_with_their_histor
     agent.reply(session, "go")
 
     state = model.systems[0]
-    last = 'picked Someone - Album 1; they turned down Someone - Album 2 ("too sad tonight")'
+    last = "picked Someone - Album 1; they turned down Someone - Album 2"
     assert f"rejection (Nov 1): {last}." in state
     assert state.index("- 3:") < state.index("- 1:") and state.index("- 3:") < state.index("- 2:")
     assert 'They turned it down on Nov 1 ("too sad tonight")' in state
