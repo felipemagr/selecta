@@ -39,9 +39,7 @@ def last_session(session: Session) -> str | None:
     on = session.memory[-1].on
     events = sorted((r for r in session.memory if r.on == on), key=lambda r: r.outcome != "picked")
     parts = [
-        f"{'picked' if r.outcome == 'picked' else 'they turned down'} {_record(r)}"
-        + (f' ("{r.reason}")' if r.reason else "")
-        for r in events
+        f"{'picked' if r.outcome == 'picked' else 'they turned down'} {_record(r)}" for r in events
     ]
     return f"Most recent session with a pick or rejection ({_day(on)}): {'; '.join(parts)}."
 
