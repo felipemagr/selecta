@@ -172,6 +172,20 @@ agent never claims a record is playing when it isn't, never uses a record that d
 answers in your language. `make eval ARGS="--simulate"` adds whole conversations with simulated
 listeners (cooperative, vague, hurried, picky, curious, switching language).
 
+## Roadmap
+
+- **Language detection in code.** The model reports the listener's language today, so a switch
+  takes a turn to reach the voice. Detecting it from the transcript would make it immediate.
+- **Hands-free talking.** A wake word and end-of-turn detection, so you can talk without holding a
+  button.
+- **Several listeners per home.** Separate memory and preferences for each person, identified by
+  their device.
+- **Bigger libraries.** Beyond one collection: the whole music server, or several homes, with a
+  dedicated vector store behind the same port once Postgres stops being enough.
+- **Evals from real sessions.** Turn a traced failure into a replayable scenario in one step, and
+  give the eval world larger candidate lists, closer to a real shelf.
+- **Finer traces.** Timing for each model round and tool call, not only for the whole turn.
+
 ## Development
 
 ```bash
