@@ -430,7 +430,10 @@ def _reject(session: Session) -> str:
         Rejection(release_id=pick.release_id, reason=said, title=pick.title, artists=pick.artists)
     )
     session.pick = None
-    return "Rejected. The candidates in the interview state are updated."
+    return (
+        "Rejected. If they named a record they want instead, find it with search_collection and "
+        "play it; otherwise pick from the updated candidates in the interview state."
+    )
 
 
 def _skip_questions(session: Session, evidence: str) -> str:
