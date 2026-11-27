@@ -13,9 +13,7 @@
   collection, and plays it on your TV.
 </p>
 
-<p align="center">
-  <img src="assets/tv-playing.png" alt="The TV playing a record" width="800">
-</p>
+https://github.com/user-attachments/assets/3ab43cf7-296b-42fb-a1c8-3603a0742012
 
 ## What it is
 
